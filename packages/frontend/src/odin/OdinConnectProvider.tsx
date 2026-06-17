@@ -5,6 +5,7 @@ import type { OdinConnectedUser, OdinUser } from 'odin-connect';
 
 import { OdinConnectContext } from './context';
 import type { OdinAuthStatus } from './context';
+import { APP_CANISTER_ID } from '../canister/config';
 
 type OdinEnv = 'prod' | 'dev' | 'local';
 
@@ -73,7 +74,17 @@ export function OdinConnectProvider({ children }: { children: ReactNode }) {
         setStatus('connecting');
         setError(null);
         try {
-            const user = await odin.connect({ requires_api: true });
+            // Request a delegation scoped to the app canister so the session can
+            // make authenticated update calls (notifyDeposit/withdraw). Falls
+            // back to api-only when no canister id is configured.
+            const user =
+                APP_CANISTER_ID === ''
+                    ? await odin.connect({ requires_api: true })
+                    : await odin.connect({
+                          requires_api: true,
+                          requires_delegation: true,
+                          targets: [APP_CANISTER_ID],
+                      });
             await adopt(user);
         } catch (err) {
             userRef.current = null;
