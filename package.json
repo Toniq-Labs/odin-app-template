@@ -15,6 +15,7 @@
     "build:canister": "dfx build canister --check",
     "build:frontend": "pnpm --filter @odin-app/frontend build",
     "dev:frontend": "pnpm --filter @odin-app/frontend dev",
+    "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   }
 }
