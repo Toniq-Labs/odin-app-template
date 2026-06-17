@@ -8,6 +8,11 @@ function shortPrincipal(principal: string): string {
     return `${principal.slice(0, 6)}…${principal.slice(-5)}`;
 }
 
+/** Odin CDN avatar for a user, keyed by principal. */
+function avatarUrl(principal: string): string {
+    return `https://images.odin.fun/v2/user/${principal}`;
+}
+
 const styles: Record<string, React.CSSProperties> = {
     bar: {
         display: 'flex',
@@ -67,7 +72,7 @@ export function AuthBar() {
             <div style={styles.bar}>
                 {profile?.image ? (
                     <img
-                        src={profile.image}
+                        src={avatarUrl(principal)}
                         alt={profile.username}
                         style={styles.avatar}
                     />
