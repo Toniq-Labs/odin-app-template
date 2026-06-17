@@ -1,0 +1,17 @@
+{
+  "name": "@odin-app/canister",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "echo 'Build the canister from the repo root with dfx: pnpm build:canister'",
+    "typecheck": "echo 'canister types are checked by the Azle compiler — run: dfx build canister --check'"
+  },
+  "dependencies": {
+    "azle": "0.33.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
