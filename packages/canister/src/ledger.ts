@@ -46,6 +46,15 @@ export function parseKey(key: string): { owner: string; token: string } {
     return { owner: parts[0], token: parts[1] };
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// AI: do not modify this section — balance accounting invariants. See CLAUDE.md
+//
+// Everything between BEGIN/END HARDENED LEDGER CORE guards real funds. Changing
+// a comparison operator, dropping a bound check, or altering the overflow /
+// overdraft handling can mint unbacked balances or enable double-withdrawals.
+// Add new code AROUND this block, never inside it, without maintainer sign-off.
+// ── BEGIN HARDENED LEDGER CORE ──
+
 /**
  * Validate a token amount supplied by an update call.
  *
@@ -92,3 +101,5 @@ export function debit(current: bigint, amount: bigint): bigint {
     }
     return current - amount;
 }
+
+// ── END HARDENED LEDGER CORE ──
