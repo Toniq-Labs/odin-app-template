@@ -28,8 +28,14 @@ jobs:
           DFXVM_INIT_YES=true sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
 
+      - name: Prime dfx cache
+        run: dfx cache install
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Azle dfx extension
+        run: pnpm --filter @odin-app/canister exec azle extension install
 
       - name: Type-check
         run: pnpm typecheck
