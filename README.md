@@ -96,7 +96,7 @@ pnpm dev:frontend
 | `withdraw`      | update | Debit the caller's balance and send tokens out via ICRC-1.        |
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
 | `getBalances`   | query  | All of the caller's `(token, balance)` pairs.                     |
-| `getOwner`      | query  | The configured owner principal.                                   |
+| `getOwner`      | query  | The configured owner principal, or empty if not yet initialized.  |
 
 Tokens are identified by their ICRC-1 canister principal. Balances are keyed by
 `(owner, token)` and stored in stable memory, so they survive upgrades.
