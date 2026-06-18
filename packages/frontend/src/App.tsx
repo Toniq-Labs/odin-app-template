@@ -1,5 +1,6 @@
 import { AuthBar } from './components/AuthBar';
 import { DepositForm } from './components/DepositForm';
+import { WithdrawForm } from './components/WithdrawForm';
 import { useOdinConnect } from './odin/useOdinConnect';
 
 export function App() {
@@ -26,9 +27,12 @@ export function App() {
             </p>
 
             {status === 'connected' ? (
-                <DepositForm />
+                <>
+                    <DepositForm />
+                    <WithdrawForm />
+                </>
             ) : (
-                <p>Connect with Odin to deposit and view your balances.</p>
+                <p>Connect with Odin to deposit, withdraw and view your balances.</p>
             )}
         </main>
     );
