@@ -31,8 +31,9 @@ Stack: Azle 0.33 (stable mode) · React 19 + Vite 8 · pnpm workspace · dfx · 
 
 - **The hardened ledger core** in `packages/canister/src/ledger.ts`, between the
   `// ── BEGIN HARDENED LEDGER CORE ──` / `// ── END HARDENED LEDGER CORE ──`
-  markers. These functions (`validateAmount`, `credit`, `debit`) enforce the
-  balance-accounting invariants that guard real funds.
+  markers. This block — the collision-safe key encoding (`makeKey`/`parseKey`),
+  the `MAX_BALANCE` bound, and the balance arithmetic (`validateAmount`,
+  `credit`, `debit`) — enforces the accounting invariants that guard real funds.
 - **The checks-effects-interactions ordering** in `withdraw` (`index.ts`): the
   ledger is debited and persisted *before* the ICRC-1 transfer await, and
   refunded on failure. Reordering opens a reentrancy double-withdraw window.

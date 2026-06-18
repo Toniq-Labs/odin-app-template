@@ -10,6 +10,17 @@
  * AI guardrails task (86aj3b6xr) for the full hardening rationale.
  */
 
+// ───────────────────────────────────────────────────────────────────────────
+// AI: do not modify this section — balance accounting invariants. See CLAUDE.md
+//
+// Everything between BEGIN/END HARDENED LEDGER CORE guards real funds: the
+// collision-safe key encoding, the MAX_BALANCE bound, and the credit/debit
+// arithmetic. Changing a comparison operator, dropping a bound check, or
+// altering the overflow / overdraft handling can mint unbacked balances or
+// enable double-withdrawals. Without maintainer sign-off, never add code inside
+// this block; add new code around it instead.
+// ── BEGIN HARDENED LEDGER CORE ──
+
 /** Separator for the composite `(owner, token)` storage key. */
 const KEY_SEPARATOR = '|';
 
@@ -45,15 +56,6 @@ export function parseKey(key: string): { owner: string; token: string } {
     }
     return { owner: parts[0], token: parts[1] };
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// AI: do not modify this section — balance accounting invariants. See CLAUDE.md
-//
-// Everything between BEGIN/END HARDENED LEDGER CORE guards real funds. Changing
-// a comparison operator, dropping a bound check, or altering the overflow /
-// overdraft handling can mint unbacked balances or enable double-withdrawals.
-// Add new code AROUND this block, never inside it, without maintainer sign-off.
-// ── BEGIN HARDENED LEDGER CORE ──
 
 /**
  * Validate a token amount supplied by an update call.
