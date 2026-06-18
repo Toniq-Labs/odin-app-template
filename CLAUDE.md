@@ -59,7 +59,8 @@ guarded code, STOP and surface it to a human instead of editing.
 - Money/amounts are `bigint` (ICRC-1 `Nat`). Never use `number` for balances.
 - Keep pure logic (no IC runtime) in separate modules so it stays unit-testable
   (see `ledger.ts`).
-- 4-space indentation, single quotes, semicolons — match existing files.
+- Indentation, quotes, semicolons — match existing files (see per-package
+  `AI_INSTRUCTIONS.md`: 4-space canister, 2-space frontend).
 - Conventional Commits for messages.
 
 ## Build / test / deploy
