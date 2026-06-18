@@ -36,8 +36,8 @@ importers:
         specifier: ^3.4.3
         version: 3.4.3
       odin-connect:
-        specifier: ^1.4.0
-        version: 1.4.0(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
+        specifier: ^1.4.2
+        version: 1.4.2(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
       react:
         specifier: ^19.2.0
         version: 19.2.7
@@ -1324,8 +1324,8 @@ packages:
     resolution: {integrity: sha512-Uzmd6LXpouKo8EUK68IjH4+E01w/hXyV3R3g/geCJo+rXLNfh1xucB+LOzYEOQPSiUK3h/xZf0cQGcSsmyL2Og==}
     engines: {node: '>=18'}
 
-  odin-connect@1.4.0:
-    resolution: {integrity: sha512-vRVp88WGca1JjY7jZr6x4NsUdA3KdEOGCaNgMDGsVEXGpl4Ka9vfKYXVsLv1I32xWyDktfinUzsl8HYgmpezZQ==}
+  odin-connect@1.4.2:
+    resolution: {integrity: sha512-DhLW4W5nZuDdQ+GiCn79910O6TIHccw7/1JsqwVrmCMg2bGgUZ+cROaMdNmsDB0oGhVWVWdhiYXDSYAzXHBgWg==}
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
@@ -2562,7 +2562,7 @@ snapshots:
 
   node-releases@2.0.47: {}
 
-  odin-connect@1.4.0(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
+  odin-connect@1.4.2(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
     dependencies:
       '@apimatic/json-bigint': 1.2.0
       '@dfinity/identity': 3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)

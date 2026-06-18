@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { OdinUtils } from 'odin-connect';
-import type { OdinBalance } from 'odin-connect';
+import type { OdinTokenWithBalance } from 'odin-connect';
 import { Principal } from '@dfinity/principal';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
@@ -53,7 +53,7 @@ export function DepositForm() {
     const actor = useCanisterActor();
     const { balances, refresh } = useInternalBalances(actor);
 
-    const [holdings, setHoldings] = useState<OdinBalance[]>([]);
+    const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
     const [selectedId, setSelectedId] = useState('');
     const [amount, setAmount] = useState('');
     const [stage, setStage] = useState<Stage>('idle');
@@ -61,7 +61,7 @@ export function DepositForm() {
 
     // Tokens the user holds on Odin that can be deposited into an ICRC ledger.
     const depositable = useMemo(
-        () => holdings.filter((t) => t.deposits && t.icrc_ledger),
+        () => holdings.filter((t) =>  t.token.icrc_ledger),
         [holdings],
     );
 
@@ -70,8 +70,8 @@ export function DepositForm() {
             return;
         }
         try {
-            const result = await user.getBalances({ page: 1, limit: 50 });
-            setHoldings([...result]);
+            const result = await user.getTokens({ page: 1, limit: 50 });
+            setHoldings(result.data.map((d) => ({ token: d.token, balance: d.balance })));
         } catch (err) {
             setError(`Failed to load tokens: ${toMessage(err)}`);
         }
@@ -83,10 +83,10 @@ export function DepositForm() {
 
     // Map ICRC ledger principal → token meta, for labelling internal balances.
     const byLedger = useMemo(() => {
-        const map = new Map<string, OdinBalance>();
+        const map = new Map<string, OdinTokenWithBalance>();
         for (const t of holdings) {
-            if (t.icrc_ledger) {
-                map.set(t.icrc_ledger, t);
+            if (t.token.icrc_ledger) {
+                map.set(t.token.icrc_ledger, t);
             }
         }
         return map;
@@ -105,15 +105,15 @@ export function DepositForm() {
             setError('Not connected.');
             return;
         }
-        const token = depositable.find((t) => t.id === selectedId);
-        if (!token || !token.icrc_ledger) {
+        const holding = depositable.find((t) => t.token.id === selectedId);
+        if (!holding || !holding.token.icrc_ledger) {
             setError('Select a token to deposit.');
             return;
         }
 
         let raw: bigint;
         try {
-            raw = OdinUtils.convertToOdinAmount(amount, token);
+            raw = OdinUtils.convertToOdinAmount(amount, holding.token);
         } catch {
             setError('Invalid amount.');
             return;
@@ -128,7 +128,7 @@ export function DepositForm() {
         let transferred: boolean;
         try {
             transferred = await user.transfer({
-                token: token.id,
+                token: holding.token.id,
                 amount: raw,
                 destination: APP_CANISTER_ID,
             });
@@ -153,7 +153,7 @@ export function DepositForm() {
         try {
             await actor.notifyDeposit(
                 Principal.fromText(principal),
-                Principal.fromText(token.icrc_ledger),
+                Principal.fromText(holding.token.icrc_ledger),
                 raw,
             );
         } catch (err) {
@@ -182,8 +182,8 @@ export function DepositForm() {
                 >
                     <option value="">Select token…</option>
                     {depositable.map((t) => (
-                        <option key={t.id} value={t.id}>
-                            {t.ticker} ({formatTokenAmount(t.balance, t.divisibility)})
+                        <option key={t.token.id} value={t.token.id}>
+                            {t.token.ticker} ({formatTokenAmount(t.balance, t.token.divisibility)})
                         </option>
                     ))}
                 </select>
@@ -228,9 +228,9 @@ export function DepositForm() {
                 <ul style={styles.list}>
                     {balances.map((b) => {
                         const meta = byLedger.get(b.token);
-                        const label = meta?.ticker ?? b.token;
+                        const label = meta?.token.ticker ?? b.token;
                         const value = meta
-                            ? formatTokenAmount(b.amount, meta.divisibility)
+                            ? formatTokenAmount(b.amount, meta.token.divisibility)
                             : b.amount.toString();
                         return (
                             <li key={b.token}>
