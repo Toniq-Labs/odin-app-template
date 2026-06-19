@@ -6,12 +6,15 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "echo 'Build the canister from the repo root with dfx: pnpm build:canister'",
-    "typecheck": "echo 'canister types are checked by the Azle compiler — run: dfx build canister --check'"
+    "typecheck": "echo 'canister types are checked by the Azle compiler — run: dfx build canister --check'",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@dfinity/principal": "^3.4.0",
     "azle": "0.33.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
   }
 }
