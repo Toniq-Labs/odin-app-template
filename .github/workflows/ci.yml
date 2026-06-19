@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install Rust wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install dfx
+        run: |
+          DFXVM_INIT_YES=true sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Prime dfx cache
+        run: dfx cache install
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Azle dfx extension
+        run: pnpm --filter @odin-app/canister exec azle extension install
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Build frontend
+        run: pnpm build:frontend
+
+      - name: Build canister
+        run: dfx build canister --check

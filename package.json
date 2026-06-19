@@ -1,0 +1,20 @@
+{
+  "name": "odin-app-template",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference canister app template for building on Odin Fun",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["azle", "esbuild"]
+  },
+  "scripts": {
+    "build": "pnpm build:frontend && pnpm build:canister",
+    "build:canister": "dfx build canister --check",
+    "build:frontend": "pnpm --filter @odin-app/frontend build",
+    "dev:frontend": "pnpm --filter @odin-app/frontend dev",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
