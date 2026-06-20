@@ -93,13 +93,33 @@ pnpm dev:frontend
 | Endpoint        | Kind   | Description                                                        |
 | --------------- | ------ | ----------------------------------------------------------------- |
 | `notifyDeposit` | update | Owner-only. Credit a user's internal balance after a deposit.     |
-| `withdraw`      | update | Debit the caller's balance and send tokens out via ICRC-1.        |
+| `deposit`       | update | Pull pre-approved funds from the Odin ledger and credit the caller. |
+| `withdraw`      | update | Debit the caller's balance and send tokens back via the Odin ledger. |
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
 | `getBalances`   | query  | All of the caller's `(token, balance)` pairs.                     |
 | `getOwner`      | query  | The configured owner principal, or empty if not yet initialized.  |
 
-Tokens are identified by their ICRC-1 canister principal. Balances are keyed by
-`(owner, token)` and stored in stable memory, so they survive upgrades.
+Tokens are identified by their **Odin token id** (text), not an ICRC ledger
+principal — every Odin token shares one ledger and is addressed by subaccount
+(`odin_token_pointer`). Balances are keyed by `(owner, tokenId)` and stored in
+stable memory, so they survive upgrades.
+
+### Withdrawal fees
+
+The Odin ledger charges a flat **BTC fee (100 sats) to the sender** on every
+transfer. On withdraw the sender is the app canister, so the canister must hold
+a small BTC float on the Odin ledger — otherwise withdrawals trap with
+`error 910: Insufficient BTC funds to cover transfer fee`.
+
+This template **subsidizes** the fee from that float for simplicity. Fund the
+canister by transferring some sats to its principal from the Odin app, then top
+it up as needed.
+
+> **Production note:** subsidizing is griefable (spam withdrawals drain the
+> float). A production app should make the **withdrawer pay** — track a per-user
+> BTC balance in the internal ledger and debit the 100-sat fee on each withdraw
+> (refund on failure, same as the token debit). See the `NOTE (fees)` comment on
+> `withdraw` in [`packages/canister/src/index.ts`](packages/canister/src/index.ts).
 
 ## Deploy to mainnet
 
@@ -122,6 +142,11 @@ Tokens are identified by their ICRC-1 canister principal. Balances are keyed by
 
 4. Note the canister IDs printed on deploy; the frontend reads them from the
    generated `.env` (`output_env_file` in `dfx.json`).
+
+5. **Fund the canister with BTC** so withdrawals can pay the Odin ledger fee
+   (see [Withdrawal fees](#withdrawal-fees)). From the Odin app, transfer some
+   sats to the app canister's principal; otherwise `withdraw` traps with
+   `error 910`.
 
 ## How to extend
 
