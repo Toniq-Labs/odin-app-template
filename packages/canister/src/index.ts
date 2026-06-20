@@ -1,7 +1,15 @@
-import { IDL, init, msgCaller, query, StableBTreeMap, update } from 'azle';
+import {
+    canisterSelf,
+    IDL,
+    init,
+    msgCaller,
+    query,
+    StableBTreeMap,
+    update,
+} from 'azle';
 import { Principal } from '@dfinity/principal';
 
-import { icrc1Transfer } from './icrc1';
+import { odinPullToken, odinSendToken } from './odin';
 import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
 
 /**
@@ -59,20 +67,56 @@ export default class {
     }
 
     /**
-     * Debit the caller's internal balance and send `amount` of `token` back to
-     * them via ICRC-1.
+     * Deposit `amount` of the Odin token `tokenId` for the caller. The caller
+     * must have already granted this canister an ICRC-2 allowance via the Odin
+     * `icrcApprove` flow (spender = this canister, on the Odin ledger's per-token
+     * subaccount); this pulls the approved funds via icrc2_transfer_from on the
+     * Odin ledger, then credits the caller's internal balance.
+     *
+     * `tokenId` is the Odin token id (the same string passed to icrcApprove),
+     * NOT an ICRC ledger principal — every Odin token shares one ledger and is
+     * addressed by subaccount. See odin.ts.
+     *
+     * ⚠️ AI-GUARD: Interaction-before-effect (the inverse of withdraw). The
+     * funds are pulled in via icrc2_transfer_from BEFORE the internal credit, so
+     * a balance is only ever credited for funds that actually settled into this
+     * canister. The credit amount equals the just-settled transfer, so a
+     * reentrant deposit cannot over-credit — each draws its own allowance. Do
+     * not credit before the transfer await resolves.
+     */
+    @update([IDL.Text, IDL.Nat], IDL.Nat)
+    async deposit(tokenId: string, amount: bigint): Promise<bigint> {
+        validateAmount(amount);
+
+        const caller = msgCaller();
+
+        // INTERACTION: pull the pre-approved funds into this canister. Throws if
+        // the allowance or balance is insufficient — no credit happens then.
+        await odinPullToken(tokenId, caller, canisterSelf(), amount);
+
+        // EFFECT: credit only what actually settled.
+        const key = makeKey(caller.toText(), tokenId);
+        const current = this.ledger.get(key) ?? 0n;
+        const next = credit(current, amount);
+        this.ledger.insert(key, next);
+        return next;
+    }
+
+    /**
+     * Debit the caller's internal balance and send `amount` of the Odin token
+     * `tokenId` back to them via the Odin ledger (icrc1_transfer).
      *
      * ⚠️ AI-GUARD: Checks-effects-interactions. The balance is debited and
      * persisted BEFORE the cross-canister transfer await. If the transfer
      * fails the balance is refunded. Do not reorder: moving the transfer
      * before the debit opens a reentrancy window for double-withdrawal.
      */
-    @update([IDL.Principal, IDL.Nat], IDL.Nat)
-    async withdraw(token: Principal, amount: bigint): Promise<bigint> {
+    @update([IDL.Text, IDL.Nat], IDL.Nat)
+    async withdraw(tokenId: string, amount: bigint): Promise<bigint> {
         validateAmount(amount);
 
         const caller = msgCaller();
-        const key = makeKey(caller.toText(), token.toText());
+        const key = makeKey(caller.toText(), tokenId);
 
         // CHECK + EFFECT: debit first, persist, then interact.
         const current = this.ledger.get(key) ?? 0n;
@@ -81,7 +125,7 @@ export default class {
 
         // INTERACTION: send tokens out. Refund on any failure.
         try {
-            return await icrc1Transfer(token, caller, amount);
+            return await odinSendToken(tokenId, caller, amount);
         } catch (error) {
             const afterAwait = this.ledger.get(key) ?? 0n;
             this.ledger.insert(key, credit(afterAwait, amount));
@@ -89,22 +133,22 @@ export default class {
         }
     }
 
-    /** The caller's internal balance for a single token. */
-    @query([IDL.Principal], IDL.Nat)
-    getBalance(token: Principal): bigint {
-        const key = makeKey(msgCaller().toText(), token.toText());
+    /** The caller's internal balance for a single Odin token. */
+    @query([IDL.Text], IDL.Nat)
+    getBalance(tokenId: string): bigint {
+        const key = makeKey(msgCaller().toText(), tokenId);
         return this.ledger.get(key) ?? 0n;
     }
 
-    /** All of the caller's internal balances, as (token, balance) pairs. */
-    @query([], IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)))
-    getBalances(): [Principal, bigint][] {
+    /** All of the caller's internal balances, as (tokenId, balance) pairs. */
+    @query([], IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)))
+    getBalances(): [string, bigint][] {
         const caller = msgCaller().toText();
-        const balances: [Principal, bigint][] = [];
+        const balances: [string, bigint][] = [];
         for (const [key, balance] of this.ledger.items()) {
             const { owner, token } = parseKey(key);
             if (owner === caller) {
-                balances.push([Principal.fromText(token), balance]);
+                balances.push([token, balance]);
             }
         }
         return balances;

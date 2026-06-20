@@ -6,33 +6,32 @@ import type { ActorMethod } from '@dfinity/agent';
  * Candid interface for the app canister. Kept in sync by hand with the
  * generated `.did` (see `dfx build canister --check` output):
  *
- *   getBalance:    (principal) -> (nat) query
- *   getBalances:   () -> (vec record { principal; nat }) query
- *   getOwner:      () -> (opt principal) query
- *   notifyDeposit: (principal, principal, nat) -> (nat)
- *   withdraw:      (principal, nat) -> (nat)
+ *   getBalance:  (text) -> (nat) query
+ *   getBalances: () -> (vec record { text; nat }) query
+ *   getOwner:    () -> (opt principal) query
+ *   deposit:     (text, nat) -> (nat)
+ *   withdraw:    (text, nat) -> (nat)
+ *
+ * Tokens are identified by their Odin token id (text), not an ICRC ledger
+ * principal — every Odin token shares one ledger, addressed by subaccount.
  */
 export const idlFactory: IDL.InterfaceFactory = ({ IDL }) =>
     IDL.Service({
-        getBalance: IDL.Func([IDL.Principal], [IDL.Nat], ['query']),
+        getBalance: IDL.Func([IDL.Text], [IDL.Nat], ['query']),
         getBalances: IDL.Func(
             [],
-            [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
+            [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
             ['query'],
         ),
         getOwner: IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
-        notifyDeposit: IDL.Func(
-            [IDL.Principal, IDL.Principal, IDL.Nat],
-            [IDL.Nat],
-            [],
-        ),
-        withdraw: IDL.Func([IDL.Principal, IDL.Nat], [IDL.Nat], []),
+        deposit: IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
+        withdraw: IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
     });
 
 export interface CanisterActor {
-    getBalance: ActorMethod<[Principal], bigint>;
-    getBalances: ActorMethod<[], Array<[Principal, bigint]>>;
+    getBalance: ActorMethod<[string], bigint>;
+    getBalances: ActorMethod<[], Array<[string, bigint]>>;
     getOwner: ActorMethod<[], [] | [Principal]>;
-    notifyDeposit: ActorMethod<[Principal, Principal, bigint], bigint>;
-    withdraw: ActorMethod<[Principal, bigint], bigint>;
+    deposit: ActorMethod<[string, bigint], bigint>;
+    withdraw: ActorMethod<[string, bigint], bigint>;
 }

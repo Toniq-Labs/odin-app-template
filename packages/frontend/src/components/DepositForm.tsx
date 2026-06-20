@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { OdinUtils } from 'odin-connect';
 import type { OdinTokenWithBalance } from 'odin-connect';
-import { Principal } from '@dfinity/principal';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
 import { useCanisterActor } from '../canister/useCanisterActor';
@@ -9,7 +8,7 @@ import { useInternalBalances } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
 import { formatTokenAmount } from '../lib/amounts';
 
-type Stage = 'idle' | 'transferring' | 'crediting' | 'done';
+type Stage = 'idle' | 'approving' | 'crediting' | 'done';
 
 function toMessage(error: unknown): string {
     if (error instanceof Error) {
@@ -44,9 +43,14 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 /**
- * Deposit flow: user picks an Odin token + amount, the odin-connect transfer
- * popup sends the tokens to the app canister, then notifyDeposit credits the
- * internal ledger and the balance is refreshed.
+ * Deposit flow: user picks an Odin token + amount, the odin-connect ICRC-2
+ * approval popup grants the app canister an allowance, then the canister's
+ * deposit() pulls the approved funds (icrc2_transfer_from) and credits the
+ * internal ledger before the balance is refreshed.
+ *
+ * The credit is backed by real funds because the canister moves the tokens
+ * itself inside deposit() before crediting — icrcApprove alone only grants the
+ * allowance.
  */
 export function DepositForm() {
     const { user, principal } = useOdinConnect();
@@ -59,11 +63,9 @@ export function DepositForm() {
     const [stage, setStage] = useState<Stage>('idle');
     const [error, setError] = useState<string | null>(null);
 
-    // Tokens the user holds on Odin that can be deposited into an ICRC ledger.
-    const depositable = useMemo(
-        () => holdings.filter((t) =>  t.token.icrc_ledger),
-        [holdings],
-    );
+    // Any token the user holds on Odin can be deposited — every Odin token
+    // lives on the shared Odin ledger, addressed by subaccount.
+    const depositable = useMemo(() => holdings, [holdings]);
 
     const loadHoldings = useCallback(async () => {
         if (user === null) {
@@ -81,18 +83,16 @@ export function DepositForm() {
         void loadHoldings();
     }, [loadHoldings]);
 
-    // Map ICRC ledger principal → token meta, for labelling internal balances.
-    const byLedger = useMemo(() => {
+    // Map Odin token id → token meta, for labelling internal balances.
+    const byId = useMemo(() => {
         const map = new Map<string, OdinTokenWithBalance>();
         for (const t of holdings) {
-            if (t.token.icrc_ledger) {
-                map.set(t.token.icrc_ledger, t);
-            }
+            map.set(t.token.id, t);
         }
         return map;
     }, [holdings]);
 
-    const busy = stage === 'transferring' || stage === 'crediting';
+    const busy = stage === 'approving' || stage === 'crediting';
 
     const deposit = useCallback(async () => {
         setError(null);
@@ -106,7 +106,7 @@ export function DepositForm() {
             return;
         }
         const holding = depositable.find((t) => t.token.id === selectedId);
-        if (!holding || !holding.token.icrc_ledger) {
+        if (!holding) {
             setError('Select a token to deposit.');
             return;
         }
@@ -123,27 +123,30 @@ export function DepositForm() {
             return;
         }
 
-        // 1. Send tokens to the app canister via the Odin approval popup.
-        setStage('transferring');
-        let transferred: boolean;
+        // 1. Approve the app canister to pull `raw` of this token via ICRC-2.
+        //    Unlike a direct transfer this only grants an allowance — the
+        //    canister must call icrc2_transfer_from to actually move the funds.
+        setStage('approving');
+        let approved: boolean;
         try {
-            transferred = await user.transfer({
+            approved = await user.icrcApprove({
                 token: holding.token.id,
+                spender: APP_CANISTER_ID,
                 amount: raw,
-                destination: APP_CANISTER_ID,
             });
         } catch (err) {
             setStage('idle');
-            setError(`Transfer failed: ${toMessage(err)}`);
+            setError(`Approval failed: ${toMessage(err)}`);
             return;
         }
-        if (!transferred) {
+        if (!approved) {
             setStage('idle');
-            setError('Transfer cancelled or rejected.');
+            setError('Approval cancelled or rejected.');
             return;
         }
 
-        // 2. Credit the internal ledger now that the transfer has settled.
+        // 2. Pull the approved funds into the canister and credit the internal
+        //    ledger. deposit() runs icrc2_transfer_from then credits the caller.
         if (actor === null) {
             setStage('idle');
             setError('Canister unavailable — reconnect to enable deposits.');
@@ -151,15 +154,10 @@ export function DepositForm() {
         }
         setStage('crediting');
         try {
-            await actor.notifyDeposit(
-                Principal.fromText(principal),
-                Principal.fromText(holding.token.icrc_ledger),
-                raw,
-            );
+            await actor.deposit(holding.token.id, raw);
         } catch (err) {
             setStage('idle');
-            // notifyDeposit is owner-gated; a non-owner caller is rejected here.
-            setError(`Credit failed (notifyDeposit): ${toMessage(err)}`);
+            setError(`Deposit failed: ${toMessage(err)}`);
             return;
         }
 
@@ -183,7 +181,7 @@ export function DepositForm() {
                     <option value="">Select token…</option>
                     {depositable.map((t) => (
                         <option key={t.token.id} value={t.token.id}>
-                            {t.token.ticker} ({formatTokenAmount(t.balance, t.token.divisibility)})
+                            {t.token.ticker} ({formatTokenAmount(t.balance, t.token.divisibility + t.token.decimals)})
                         </option>
                     ))}
                 </select>
@@ -204,8 +202,8 @@ export function DepositForm() {
                     onClick={() => void deposit()}
                     disabled={busy || selectedId === '' || amount === ''}
                 >
-                    {stage === 'transferring'
-                        ? 'Awaiting transfer…'
+                    {stage === 'approving'
+                        ? 'Awaiting approval…'
                         : stage === 'crediting'
                           ? 'Crediting…'
                           : 'Deposit'}
@@ -227,10 +225,10 @@ export function DepositForm() {
             ) : (
                 <ul style={styles.list}>
                     {balances.map((b) => {
-                        const meta = byLedger.get(b.token);
+                        const meta = byId.get(b.token);
                         const label = meta?.token.ticker ?? b.token;
                         const value = meta
-                            ? formatTokenAmount(b.amount, meta.token.divisibility)
+                            ? formatTokenAmount(b.amount, meta.token.divisibility + meta.token.decimals)
                             : b.amount.toString();
                         return (
                             <li key={b.token}>
@@ -242,9 +240,10 @@ export function DepositForm() {
             )}
 
             <p style={styles.note}>
-                Note: <code>notifyDeposit</code> is owner-gated. In production a
-                trusted minter performs the credit step after verifying the
-                transfer; locally the deployer (owner) is the test user.
+                Note: <code>deposit</code> pulls the approved funds via
+                <code> icrc2_transfer_from</code> and credits your balance in one
+                call — the credit is backed by tokens the canister actually
+                moved, so no trusted minter is required.
             </p>
         </section>
     );

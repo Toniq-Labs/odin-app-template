@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Principal } from '@dfinity/principal';
 
 import type { CanisterActor } from './idl';
 
 export interface InternalBalance {
-    token: string; // ICRC-1 ledger principal (text)
+    token: string; // Odin token id
     amount: bigint;
 }
 
@@ -25,8 +24,8 @@ export function useInternalBalances(actor: CanisterActor | null) {
         try {
             const entries = await actor.getBalances();
             setBalances(
-                entries.map(([token, amount]: [Principal, bigint]) => ({
-                    token: token.toText(),
+                entries.map(([token, amount]: [string, bigint]) => ({
+                    token,
                     amount,
                 })),
             );
