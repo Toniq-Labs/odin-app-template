@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { OdinUtils } from 'odin-connect';
-import type { OdinBalance } from 'odin-connect';
-import { Principal } from '@dfinity/principal';
+import type { OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
 import { useCanisterActor } from '../canister/useCanisterActor';
@@ -52,37 +51,37 @@ const styles: Record<string, React.CSSProperties> = {
 /**
  * Withdraw flow: user picks a token from their internal balances and an amount
  * (capped at that balance), the canister debits the ledger and sends the tokens
- * back to the caller's principal via ICRC-1, then the balance refreshes.
+ * back to the caller on the Odin ledger, then the balance refreshes.
  */
 export function WithdrawForm() {
     const { user } = useOdinConnect();
     const actor = useCanisterActor();
     const { balances, refresh } = useInternalBalances(actor);
 
-    const [meta, setMeta] = useState<Map<string, OdinBalance>>(new Map());
-    const [selectedLedger, setSelectedLedger] = useState('');
+    const [meta, setMeta] = useState<Map<string, OdinTokenWithBalance>>(
+        new Map(),
+    );
+    const [selectedTokenId, setSelectedTokenId] = useState('');
     const [amount, setAmount] = useState('');
     const [stage, setStage] = useState<Stage>('idle');
     const [error, setError] = useState<string | null>(null);
 
-    // Token metadata (ticker, divisibility) for labelling + amount conversion,
-    // keyed by ICRC ledger principal. Best-effort from the user's Odin holdings.
+    // Token metadata (ticker, divisibility, decimals) for labelling + amount
+    // conversion, keyed by Odin token id. Best-effort from the user's holdings.
     useEffect(() => {
         let active = true;
         if (user === null) {
             return;
         }
         user
-            .getBalances({ page: 1, limit: 50 })
+            .getTokens({ page: 1, limit: 50 })
             .then((result) => {
                 if (!active) {
                     return;
                 }
-                const map = new Map<string, OdinBalance>();
-                for (const t of result) {
-                    if (t.icrc_ledger) {
-                        map.set(t.icrc_ledger, t);
-                    }
+                const map = new Map<string, OdinTokenWithBalance>();
+                for (const d of result.data) {
+                    map.set(d.token.id, { token: d.token, balance: d.balance });
                 }
                 setMeta(map);
             })
@@ -95,19 +94,24 @@ export function WithdrawForm() {
     }, [user]);
 
     const selected = useMemo(
-        () => balances.find((b) => b.token === selectedLedger) ?? null,
-        [balances, selectedLedger],
+        () => balances.find((b) => b.token === selectedTokenId) ?? null,
+        [balances, selectedTokenId],
     );
-    const selectedMeta = selectedLedger ? meta.get(selectedLedger) : undefined;
-    const divisibility = selectedMeta?.divisibility ?? 0;
+    const selectedMeta = selectedTokenId
+        ? meta.get(selectedTokenId)
+        : undefined;
+    // Odin amounts scale by divisibility + decimals (matches convertToOdinAmount).
+    const places = selectedMeta
+        ? selectedMeta.token.divisibility + selectedMeta.token.decimals
+        : 0;
 
     const busy = stage === 'withdrawing';
 
     const fillMax = useCallback(() => {
         if (selected) {
-            setAmount(formatTokenAmount(selected.amount, divisibility));
+            setAmount(formatTokenAmount(selected.amount, places));
         }
-    }, [selected, divisibility]);
+    }, [selected, places]);
 
     const withdraw = useCallback(async () => {
         setError(null);
@@ -125,12 +129,12 @@ export function WithdrawForm() {
             return;
         }
 
-        // Convert using token divisibility when known; otherwise treat the input
-        // as raw base units.
+        // Convert using token meta when known; otherwise treat the input as raw
+        // base units.
         let raw: bigint;
         try {
             raw = selectedMeta
-                ? OdinUtils.convertToOdinAmount(amount, selectedMeta)
+                ? OdinUtils.convertToOdinAmount(amount, selectedMeta.token)
                 : BigInt(amount);
         } catch {
             setError('Invalid amount.');
@@ -147,11 +151,11 @@ export function WithdrawForm() {
 
         setStage('withdrawing');
         try {
-            await actor.withdraw(Principal.fromText(selected.token), raw);
+            await actor.withdraw(selected.token, raw);
         } catch (err) {
             setStage('idle');
-            // Canister rejects overdrafts; an ICRC-1 transfer failure refunds
-            // and surfaces here too.
+            // Canister rejects overdrafts; an Odin ledger transfer failure
+            // refunds the debited balance and surfaces here too.
             setError(`Withdraw failed: ${toMessage(err)}`);
             return;
         }
@@ -168,9 +172,9 @@ export function WithdrawForm() {
             <div style={styles.row}>
                 <select
                     style={styles.select}
-                    value={selectedLedger}
+                    value={selectedTokenId}
                     onChange={(e) => {
-                        setSelectedLedger(e.target.value);
+                        setSelectedTokenId(e.target.value);
                         setAmount('');
                     }}
                     disabled={busy}
@@ -178,8 +182,11 @@ export function WithdrawForm() {
                     <option value="">Select token…</option>
                     {balances.map((b) => {
                         const m = meta.get(b.token);
-                        const label = m?.ticker ?? b.token;
-                        const value = formatTokenAmount(b.amount, m?.divisibility ?? 0);
+                        const label = m?.token.ticker ?? b.token;
+                        const value = formatTokenAmount(
+                            b.amount,
+                            m ? m.token.divisibility + m.token.decimals : 0,
+                        );
                         return (
                             <option key={b.token} value={b.token}>
                                 {label} ({value})
@@ -211,7 +218,7 @@ export function WithdrawForm() {
                     type="button"
                     style={styles.button}
                     onClick={() => void withdraw()}
-                    disabled={busy || selectedLedger === '' || amount === ''}
+                    disabled={busy || selectedTokenId === '' || amount === ''}
                 >
                     {busy ? 'Withdrawing…' : 'Withdraw'}
                 </button>
