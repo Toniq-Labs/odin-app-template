@@ -17,25 +17,27 @@ flowchart LR
     oc["odin-connect SDK"]
     popup["Odin Fun<br/>approval popup"]
     can["App canister<br/>(Azle)"]
-    ledger[("Internal ledger<br/>StableBTreeMap<br/>(owner|token) → balance")]
-    icrc["ICRC-1 token<br/>canisters"]
+    ledger[("Internal ledger<br/>StableBTreeMap<br/>(owner|tokenId) → balance")]
+    odin["Odin ledger<br/>(one multiplexed ICRC ledger)"]
 
     user --> fe
     fe --> oc
     oc --> popup
-    popup -->|approved transfer| icrc
-    fe -->|"notifyDeposit / withdraw / getBalances"| can
+    popup -->|icrc2_approve| odin
+    fe -->|"deposit / withdraw / getBalances"| can
     can --> ledger
-    can -->|"icrc1Transfer (withdraw)"| icrc
+    can -->|"icrc2_transfer_from (deposit)<br/>icrc1_transfer (withdraw)"| odin
 ```
 
-**Deposit**: the user approves a transfer through the Odin Fun popup; the token
-lands in the app canister; a trusted owner then calls `notifyDeposit` to credit
-the user's internal balance.
+**Deposit**: the user approves the app canister as an ICRC-2 spender through the
+Odin Fun popup; the canister then pulls the approved funds itself
+(`icrc2_transfer_from` on the Odin ledger) and credits the user's internal
+balance. It is permissionless and self-verifying — a credit is only recorded for
+funds that actually settled into the canister.
 
 **Withdraw**: the user calls `withdraw`; the canister debits the internal
-balance (persisted *before* the transfer await) and sends the tokens back out
-via ICRC-1, refunding on failure.
+balance (persisted *before* the transfer await) and sends the tokens back out on
+the Odin ledger (`icrc1_transfer`), refunding on failure.
 
 ## Layout
 
@@ -86,7 +88,6 @@ pnpm dev:frontend
 
 | Endpoint        | Kind   | Description                                                        |
 | --------------- | ------ | ----------------------------------------------------------------- |
-| `notifyDeposit` | update | Owner-only. Credit a user's internal balance after a deposit.     |
 | `deposit`       | update | Pull pre-approved funds from the Odin ledger and credit the caller. |
 | `withdraw`      | update | Debit the caller's balance and send tokens back via the Odin ledger. |
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
@@ -129,10 +130,11 @@ it up as needed.
    ```
 
 3. The deploying principal is recorded as the **owner** (see `@init` in
-   [`packages/canister/src/index.ts`](packages/canister/src/index.ts)). Only the
-   owner may call `notifyDeposit`, so deposits should be credited by a trusted
-   minter that independently verifies the transfer settled. Keep this identity
-   secure.
+   [`packages/canister/src/index.ts`](packages/canister/src/index.ts)) — a
+   generic admin handle for any admin-gated endpoints you add later. Deposits are
+   **not** owner-gated: `deposit` is permissionless and self-verifying (it pulls
+   the caller's own pre-approved funds before crediting), so no trusted minter is
+   needed.
 
 4. Note the canister IDs printed on deploy; the frontend reads them from the
    generated `.env` (`output_env_file` in `dfx.json`).
@@ -144,9 +146,9 @@ it up as needed.
 
 ## How to extend
 
-**Add support for a new token** — no code change needed. Tokens are any ICRC-1
-canister principal; pass the principal to `notifyDeposit` / `withdraw` /
-`getBalance`. The ledger keys every balance by `(owner, token)`, so new tokens
+**Add support for a new token** — no code change needed. Tokens are identified
+by their Odin token id (text); pass the id to `deposit` / `withdraw` /
+`getBalance`. The ledger keys every balance by `(owner, tokenId)`, so new tokens
 work out of the box.
 
 **Add a new canister endpoint** — add a `@query` / `@update` method in
