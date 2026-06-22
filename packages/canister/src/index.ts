@@ -125,12 +125,15 @@ export default class {
 
         // INTERACTION: send tokens out. Refund on any failure.
         try {
-            return await odinSendToken(tokenId, caller, amount);
+            await odinSendToken(tokenId, caller, amount);
         } catch (error) {
             const afterAwait = this.ledger.get(key) ?? 0n;
             this.ledger.insert(key, credit(afterAwait, amount));
             throw error;
         }
+
+        // Return the caller's new internal balance, matching `deposit`.
+        return next;
     }
 
     /** The caller's internal balance for a single Odin token. */
