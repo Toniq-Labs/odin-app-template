@@ -7,9 +7,9 @@ import type { CanisterActor } from './idl';
 
 /**
  * Build a typed actor for the app canister using the caller's delegation
- * identity (from Odin Connect). Update calls like `notifyDeposit` require an
- * authenticated identity; an anonymous agent would be rejected by the owner
- * gate.
+ * identity (from Odin Connect). Update calls like `deposit` / `withdraw` are
+ * caller-scoped (they act on `msgCaller()`'s own balance), so they require an
+ * authenticated identity — an anonymous agent would act as the wrong principal.
  *
  * On a local replica the agent must fetch the (insecure) root key — never do
  * this against mainnet, where it would let a MITM forge responses.

@@ -27,8 +27,9 @@ src/
    balance *before* `await icrc1Transfer(...)`. Refund on failure. Never move the
    transfer before the debit — Azle processes other messages at await points, so
    that ordering enables a reentrancy double-withdraw.
-3. **Keep `notifyDeposit` owner-gated.** It is the only balance-mint path; an
-   ungated mint = unbacked balances.
+3. **Preserve interaction-before-effect in `deposit`.** Pull the funds via
+   `icrc2_transfer_from` *before* crediting the internal balance. It is the only
+   balance-mint path; crediting before the pull settles = unbacked balances.
 4. **Amounts are `bigint`** (Candid `Nat`). Never represent balances as `number`
    — precision loss is a fund-loss bug.
 5. **Validate every update-call input.** Reuse `validateAmount`; reject zero,

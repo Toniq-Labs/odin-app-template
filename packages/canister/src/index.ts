@@ -16,54 +16,36 @@ import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
  * odin-app-template reference canister — multi-token internal ledger.
  *
  * Tracks an internal balance per (principal, token) pair, backed by stable
- * memory so balances survive upgrades. Tokens are identified by their ICRC-1
- * canister principal.
+ * memory so balances survive upgrades. Tokens are identified by their Odin
+ * token id (text) — every Odin token shares one ledger, addressed by subaccount.
  *
  * Flows:
- *   deposit  — an Odin transfer lands in this canister, then a trusted caller
- *              invokes notifyDeposit to credit the user's internal balance.
- *   withdraw — the user debits their internal balance and the canister sends
- *              the tokens back out via ICRC-1.
+ *   deposit  — the caller pre-approves this canister on the Odin ledger, then
+ *              this canister pulls the funds (icrc2_transfer_from) and credits
+ *              the caller's internal balance.
+ *   withdraw — the caller debits their internal balance and the canister sends
+ *              the tokens back out on the Odin ledger (icrc1_transfer).
  *
  * ⚠️ AI-GUARD: The balance-mutating paths below are hardened ledger core.
- * Preserve the checks-effects-interactions ordering and the authorization
- * gate. See ledger.ts and the AI guardrails task (86aj3b6xr).
+ * Preserve the checks-effects-interactions ordering. See ledger.ts and the AI
+ * guardrails task (86aj3b6xr).
  */
 export default class {
     /** (owner|token) → balance. Memory id 0. */
     ledger = new StableBTreeMap<string, bigint>(0);
 
-    /** Canister config (e.g. the deposit minter/owner). Memory id 1. */
+    /** Canister config (e.g. the deploying admin principal). Memory id 1. */
     config = new StableBTreeMap<string, string>(1);
 
     /**
-     * Record the deploying principal as the owner. Only the owner may credit
-     * deposits via notifyDeposit.
+     * Record the deploying principal as the owner — a generic admin handle
+     * (e.g. for future admin-gated endpoints). Deposits are NOT owner-gated:
+     * `deposit` is permissionless and self-verifying (it pulls the caller's own
+     * pre-approved funds before crediting), so no trusted minter is needed.
      */
     @init([])
     initialize(): void {
         this.config.insert('owner', msgCaller().toText());
-    }
-
-    /**
-     * Credit a user's internal balance after an Odin/ICRC-1 deposit has been
-     * confirmed off-chain.
-     *
-     * ⚠️ AI-GUARD: Gated to the owner. In production the owner should be a
-     * minter that independently verifies the deposit actually settled before
-     * calling this — never expose this endpoint to arbitrary callers, or
-     * anyone could mint unbacked balances.
-     */
-    @update([IDL.Principal, IDL.Principal, IDL.Nat], IDL.Nat)
-    notifyDeposit(owner: Principal, token: Principal, amount: bigint): bigint {
-        this.assertOwner();
-        validateAmount(amount);
-
-        const key = makeKey(owner.toText(), token.toText());
-        const current = this.ledger.get(key) ?? 0n;
-        const next = credit(current, amount);
-        this.ledger.insert(key, next);
-        return next;
     }
 
     /**
@@ -162,15 +144,5 @@ export default class {
     getOwner(): [Principal] | [] {
         const owner = this.config.get('owner');
         return owner === undefined ? [] : [Principal.fromText(owner)];
-    }
-
-    private assertOwner(): void {
-        const owner = this.config.get('owner');
-        if (owner === undefined) {
-            throw new Error('canister not initialized');
-        }
-        if (msgCaller().toText() !== owner) {
-            throw new Error('unauthorized: only the owner may credit deposits');
-        }
     }
 }

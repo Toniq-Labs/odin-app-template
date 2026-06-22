@@ -36,8 +36,10 @@ Stack: Azle 0.33 (stable mode) · React 19 + Vite 8 · pnpm workspace · dfx · 
 - **The checks-effects-interactions ordering** in `withdraw` (`index.ts`): the
   ledger is debited and persisted *before* the ICRC-1 transfer await, and
   refunded on failure. Reordering opens a reentrancy double-withdraw window.
-- **The owner gate** on `notifyDeposit`: only the configured owner may credit
-  balances. Loosening this lets anyone mint unbacked balances.
+- **The interaction-before-effect ordering** in `deposit` (`index.ts`): the
+  funds are pulled in via `icrc2_transfer_from` *before* the internal credit, so
+  a balance is only credited for funds that actually settled. Crediting before
+  the pull await resolves lets anyone mint unbacked balances.
 
 Sections that must not change are marked inline with `⚠️ AI-GUARD` and the
 `AI: do not modify this section` sentinel. If a task seems to require touching
@@ -45,8 +47,9 @@ guarded code, STOP and surface it to a human instead of editing.
 
 ## Invariants (never violate)
 
-1. Every credited balance is backed by a real deposit. `notifyDeposit` is the
-   only mint path and it is owner-gated.
+1. Every credited balance is backed by a real deposit. `deposit` is the only
+   mint path; it credits only funds it has already pulled into this canister via
+   `icrc2_transfer_from` (interaction-before-effect).
 2. A withdrawal can never exceed the caller's internal balance (`debit` rejects
    overdrafts).
 3. Balances are unsigned and bounded (`0 .. MAX_BALANCE`); no overflow.

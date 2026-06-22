@@ -75,7 +75,7 @@ export function OdinConnectProvider({ children }: { children: ReactNode }) {
         setError(null);
         try {
             // Request a delegation scoped to the app canister so the session can
-            // make authenticated update calls (notifyDeposit/withdraw). Falls
+            // make authenticated update calls (deposit/withdraw). Falls
             // back to api-only when no canister id is configured.
             const user =
                 APP_CANISTER_ID === ''
