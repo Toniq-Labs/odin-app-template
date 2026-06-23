@@ -3,12 +3,18 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
-import { useCanisterActor } from '../canister/useCanisterActor';
-import { useInternalBalances } from '../canister/useInternalBalances';
+import type { CanisterActor } from '../canister/idl';
+import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
 import { formatTokenAmount } from '../lib/amounts';
 
 type Stage = 'idle' | 'approving' | 'crediting' | 'done';
+
+interface DepositFormProps {
+    actor: CanisterActor | null;
+    balances: InternalBalance[];
+    refresh: () => Promise<void>;
+}
 
 function toMessage(error: unknown): string {
     if (error instanceof Error) {
@@ -52,10 +58,8 @@ const styles: Record<string, React.CSSProperties> = {
  * itself inside deposit() before crediting — icrcApprove alone only grants the
  * allowance.
  */
-export function DepositForm() {
+export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
     const { user, principal } = useOdinConnect();
-    const actor = useCanisterActor();
-    const { balances, refresh } = useInternalBalances(actor);
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
     const [selectedId, setSelectedId] = useState('');

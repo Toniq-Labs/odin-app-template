@@ -3,12 +3,18 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
-import { useCanisterActor } from '../canister/useCanisterActor';
-import { useInternalBalances } from '../canister/useInternalBalances';
+import type { CanisterActor } from '../canister/idl';
+import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
 import { formatTokenAmount } from '../lib/amounts';
 
 type Stage = 'idle' | 'withdrawing' | 'done';
+
+interface WithdrawFormProps {
+    actor: CanisterActor | null;
+    balances: InternalBalance[];
+    refresh: () => Promise<void>;
+}
 
 function toMessage(error: unknown): string {
     if (error instanceof Error) {
@@ -53,10 +59,8 @@ const styles: Record<string, React.CSSProperties> = {
  * (capped at that balance), the canister debits the ledger and sends the tokens
  * back to the caller on the Odin ledger, then the balance refreshes.
  */
-export function WithdrawForm() {
+export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
     const { user } = useOdinConnect();
-    const actor = useCanisterActor();
-    const { balances, refresh } = useInternalBalances(actor);
 
     const [meta, setMeta] = useState<Map<string, OdinTokenWithBalance>>(
         new Map(),
