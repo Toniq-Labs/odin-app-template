@@ -99,6 +99,16 @@ pnpm dev:frontend
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
 | `getBalances`   | query  | All of the caller's `(token, balance)` pairs.                     |
 | `getOwner`      | query  | The configured owner principal, or empty if not yet initialized.  |
+| `icrc28_trusted_origins` | update | [ICRC-28](https://github.com/dfinity/wg-identity-authentication) trusted origins — the web origins allowed to request signed calls. Odin Connect calls this before issuing a delegation and refuses auth if your app's origin is not listed. |
+
+> **ICRC-28 / Odin Connect auth:** the trusted origins are configured in
+> `TRUSTED_ORIGINS` in
+> [`packages/canister/src/index.ts`](packages/canister/src/index.ts). Each entry
+> must be a bare origin (`scheme://host[:port]`, no trailing slash, no path);
+> https only, except `http://localhost` in dev. The signer does an exact string
+> match. **Edit this list to your deployed frontend origin before going live** —
+> a wrong or missing origin fails login silently. It must be `update` (not
+> `query`): the signer issues a replicated call so the response is certified.
 
 Tokens are identified by their **Odin token id** (text), not an ICRC ledger
 principal — every Odin token shares one ledger and is addressed by subaccount
@@ -145,7 +155,17 @@ it up as needed.
 4. Note the canister IDs printed on deploy; the frontend reads them from the
    generated `.env` (`output_env_file` in `dfx.json`).
 
-5. **Fund the canister with BTC** so withdrawals can pay the Odin ledger fee
+5. **Set your trusted origins.** Edit `TRUSTED_ORIGINS` in
+   [`packages/canister/src/index.ts`](packages/canister/src/index.ts) to the
+   origin your frontend is served from (e.g. your asset-canister URL or custom
+   domain), then redeploy. Odin Connect login fails until your origin is listed.
+   Verify with:
+
+   ```sh
+   dfx canister call canister icrc28_trusted_origins '()' --network ic
+   ```
+
+6. **Fund the canister with BTC** so withdrawals can pay the Odin ledger fee
    (see [Withdrawal fees](#withdrawal-fees)). From the Odin app, transfer some
    sats to the app canister's principal; otherwise `withdraw` traps with
    `error 910`.
