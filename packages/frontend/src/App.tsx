@@ -2,9 +2,15 @@ import { AuthBar } from './components/AuthBar';
 import { DepositForm } from './components/DepositForm';
 import { WithdrawForm } from './components/WithdrawForm';
 import { useOdinConnect } from './odin/useOdinConnect';
+import { useCanisterActor } from './canister/useCanisterActor';
+import { useInternalBalances } from './canister/useInternalBalances';
 
 export function App() {
     const { status } = useOdinConnect();
+    // Internal balances live here so deposit and withdraw share one source of
+    // truth — a deposit refresh immediately updates the withdraw selector.
+    const actor = useCanisterActor();
+    const { balances, refresh } = useInternalBalances(actor);
 
     return (
         <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem', maxWidth: '720px' }}>
@@ -28,8 +34,8 @@ export function App() {
 
             {status === 'connected' ? (
                 <>
-                    <DepositForm />
-                    <WithdrawForm />
+                    <DepositForm actor={actor} balances={balances} refresh={refresh} />
+                    <WithdrawForm actor={actor} balances={balances} refresh={refresh} />
                 </>
             ) : (
                 <p>Connect with Odin to deposit, withdraw and view your balances.</p>
