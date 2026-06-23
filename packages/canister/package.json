@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
+    "postinstall": "command -v dfx >/dev/null 2>&1 && azle extension install || echo 'dfx not found — skipping azle extension install (run: pnpm --filter @odin-app/canister exec azle extension install)'",
     "build": "echo 'Build the canister from the repo root with dfx: pnpm build:canister'",
     "typecheck": "echo 'canister types are checked by the Azle compiler — run: dfx build canister --check'"
   },
