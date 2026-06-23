@@ -28,12 +28,10 @@ import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
  * The signer does an exact string match, so e.g. a trailing `/` will not match.
  */
 const TRUSTED_ORIGINS: string[] = [
-    // Local dev — Vite dev server (default port). Remove for production.
+    // Local dev — Vite dev server (default port).
     'http://localhost:5173',
-    // Production — replace with your deployed frontend asset-canister origin
-    // and/or custom domain, e.g.:
-    //   'https://<your-frontend-canister-id>.icp0.io',
-    //   'https://app.example.com',
+    // Production — Netlify-hosted frontend.
+    'https://odin-app-template.netlify.app',
 ];
 
 /**
