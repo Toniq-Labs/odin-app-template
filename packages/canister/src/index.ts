@@ -13,6 +13,30 @@ import { odinPullToken, odinSendToken } from './odin';
 import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
 
 /**
+ * ⚠️ EDIT BEFORE DEPLOY — must list the exact origin(s) your frontend is served
+ * from, or Odin Connect login will fail with "origin is not trusted".
+ *
+ * ICRC-28 trusted origins: the web origins allowed to request signed calls to
+ * this canister on a user's behalf. Before issuing a delegation, Odin Connect
+ * (the signer) calls `icrc28_trusted_origins` on every target canister and
+ * refuses the whole auth if the relying-party origin is absent — or if the
+ * endpoint is missing entirely. The origin is the page that opened the signer,
+ * NOT this canister's own URL.
+ *
+ * Each entry MUST be a bare origin: `scheme://host[:port]`, no trailing slash,
+ * no path. https only, except `http://localhost`/`127.0.0.1` for local dev.
+ * The signer does an exact string match, so e.g. a trailing `/` will not match.
+ */
+const TRUSTED_ORIGINS: string[] = [
+    // Local dev — Vite dev server (default port). Remove for production.
+    'http://localhost:5173',
+    // Production — replace with your deployed frontend asset-canister origin
+    // and/or custom domain, e.g.:
+    //   'https://<your-frontend-canister-id>.icp0.io',
+    //   'https://app.example.com',
+];
+
+/**
  * odin-app-template reference canister — multi-token internal ledger.
  *
  * Tracks an internal balance per (principal, token) pair, backed by stable
@@ -151,5 +175,21 @@ export default class {
     getOwner(): [Principal] | [] {
         const owner = this.config.get('owner');
         return owner === undefined ? [] : [Principal.fromText(owner)];
+    }
+
+    /**
+     * ICRC-28: the web origins this canister trusts to request signed calls on
+     * a user's behalf. Odin Connect calls this before issuing a delegation and
+     * refuses the auth if the relying-party origin is not listed. Configure the
+     * list in `TRUSTED_ORIGINS` above.
+     *
+     * MUST be `@update`, not `@query`: the signer issues a replicated call so
+     * the response is consensus-certified — a query reply comes from a single
+     * replica and is spoofable, so signers reject it. Returns the record form
+     * `{ trusted_origins }` the ICRC-28 standard (and the signer) expects.
+     */
+    @update([], IDL.Record({ trusted_origins: IDL.Vec(IDL.Text) }))
+    icrc28_trusted_origins(): { trusted_origins: string[] } {
+        return { trusted_origins: TRUSTED_ORIGINS };
     }
 }
