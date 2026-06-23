@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["azle", "esbuild"]
+    "onlyBuiltDependencies": ["esbuild"]
   },
   "scripts": {
     "build": "pnpm build:frontend && pnpm build:canister",
