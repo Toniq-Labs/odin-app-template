@@ -30,6 +30,8 @@ import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
 const TRUSTED_ORIGINS: string[] = [
     // Local dev — Vite dev server (default port).
     'http://localhost:5173',
+    // Local dev — Vite dev server (fallback port when 5173 is taken).
+    'http://localhost:5174',
     // Production — Netlify-hosted frontend.
     'https://odin-app-template.netlify.app',
 ];
