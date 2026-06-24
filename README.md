@@ -111,8 +111,10 @@ not griefable. The flow:
 1. On withdraw the frontend requests an ICRC-2 BTC approval (`icrcApprove`,
    token `"btc"`) for **2× the fee**.
 2. `withdraw` pulls the fee from the caller's BTC (`icrc2_transfer_from`), then
-   sends the tokens. The pulled BTC funds the outbound transfer's own fee, so
-   the canister **nets zero BTC and needs no float**.
+   sends the tokens. The pulled BTC funds the outbound transfer's own fee, so on
+   success the canister **nets zero BTC and needs no float**. If the token send
+   fails after the fee pull, the fee is forfeited (not refunded — returning it
+   would cost another BTC transfer), leaving the canister a small BTC surplus.
 
 Why 2×: pulling BTC is itself a transfer, and the ledger charges the caller a
 fee on that pull too (debited from `from`, per ICRC-2). So the withdrawer pays

@@ -100,8 +100,10 @@ export default class {
      * this canister pulls the fee from the withdrawer first: the caller
      * pre-approves BTC (>= 2x `ODIN_BTC_FEE`) via the Odin `icrcApprove` flow,
      * and `withdraw` pulls `ODIN_BTC_FEE` BTC into this canister to fund the
-     * outbound fee. The pulled BTC cancels the outbound fee, so the canister
-     * nets zero BTC and needs no float. See odin.ts and README.
+     * outbound fee. The pulled BTC cancels the outbound fee, so on success the
+     * canister nets zero BTC and needs no float. A failed token send after the
+     * fee pull leaves the pulled fee as canister surplus (forfeited below, not
+     * refunded). See odin.ts and README.
      *
      * ⚠️ AI-GUARD: Checks-effects-interactions. The balance is debited and
      * persisted BEFORE any cross-canister transfer await. If a transfer fails
