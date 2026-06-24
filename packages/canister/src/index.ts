@@ -88,6 +88,13 @@ export default class {
      * Debit the caller's internal balance and send `amount` of the Odin token
      * `tokenId` back to them via the Odin ledger (icrc1_transfer).
      *
+     * NOTE (fees): the Odin ledger charges a flat BTC fee (100 sats) to the
+     * SENDER on every transfer — here that sender is this canister. So the
+     * canister must hold a small BTC float on the Odin ledger or withdrawals
+     * trap with error 910. This template subsidizes the fee from that float for
+     * simplicity; a production app should charge the withdrawer instead (track a
+     * per-user BTC balance and debit the fee on withdraw). See README.
+     *
      * ⚠️ AI-GUARD: Checks-effects-interactions. The balance is debited and
      * persisted BEFORE the cross-canister transfer await. If the transfer
      * fails the balance is refunded. Do not reorder: moving the transfer
