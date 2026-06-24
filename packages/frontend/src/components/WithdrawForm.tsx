@@ -7,8 +7,13 @@ import type { CanisterActor } from '../canister/idl';
 import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
 import { formatTokenAmount } from '../lib/amounts';
+import {
+    BTC_TOKEN_ID,
+    WITHDRAW_FEE_APPROVAL,
+    WITHDRAW_FEE_SATS,
+} from '../lib/fees';
 
-type Stage = 'idle' | 'withdrawing' | 'done';
+type Stage = 'idle' | 'approving' | 'withdrawing' | 'done';
 
 interface WithdrawFormProps {
     actor: CanisterActor | null;
@@ -109,7 +114,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         ? selectedMeta.token.divisibility + selectedMeta.token.decimals
         : 0;
 
-    const busy = stage === 'withdrawing';
+    const busy = stage === 'approving' || stage === 'withdrawing';
 
     const fillMax = useCallback(() => {
         if (selected) {
@@ -152,7 +157,36 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             setError('Insufficient internal balance.');
             return;
         }
+        if (user === null) {
+            setError('Not connected.');
+            return;
+        }
 
+        // 1. Approve BTC for the withdrawal fee. The canister pulls this during
+        //    withdraw to pay the Odin ledger's per-transfer fee, so withdrawals
+        //    need no canister BTC float. The allowance covers the fee twice (the
+        //    pull amount + the ledger fee on that pull) — see lib/fees.ts.
+        setStage('approving');
+        let approved: boolean;
+        try {
+            approved = await user.icrcApprove({
+                token: BTC_TOKEN_ID,
+                spender: APP_CANISTER_ID,
+                amount: WITHDRAW_FEE_APPROVAL,
+            });
+        } catch (err) {
+            setStage('idle');
+            setError(`BTC fee approval failed: ${toMessage(err)}`);
+            return;
+        }
+        if (!approved) {
+            setStage('idle');
+            setError('BTC fee approval cancelled or rejected.');
+            return;
+        }
+
+        // 2. Withdraw: the canister pulls the approved fee, then sends the
+        //    tokens. A ledger transfer failure refunds the debited balance.
         setStage('withdrawing');
         try {
             await actor.withdraw(selected.token, raw);
@@ -167,7 +201,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         setStage('done');
         setAmount('');
         await refresh();
-    }, [actor, selected, selectedMeta, amount, refresh]);
+    }, [actor, selected, selectedMeta, amount, refresh, user]);
 
     return (
         <section style={styles.card}>
@@ -224,9 +258,19 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     onClick={() => void withdraw()}
                     disabled={busy || selectedTokenId === '' || amount === ''}
                 >
-                    {busy ? 'Withdrawing…' : 'Withdraw'}
+                    {stage === 'approving'
+                        ? 'Awaiting BTC approval…'
+                        : stage === 'withdrawing'
+                          ? 'Withdrawing…'
+                          : 'Withdraw'}
                 </button>
             </div>
+
+            <p style={styles.note}>
+                Network fee: ~{WITHDRAW_FEE_SATS} sats in BTC. You approve BTC on
+                withdraw so the canister can cover the Odin ledger transfer fee —
+                no canister float needed.
+            </p>
 
             {error !== null ? (
                 <div style={styles.error} role="alert">
