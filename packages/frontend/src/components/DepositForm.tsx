@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { OdinUtils } from 'odin-connect';
-import type { OdinTokenWithBalance } from 'odin-connect';
+import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
 import type { CanisterActor } from '../canister/idl';
@@ -59,9 +59,10 @@ const styles: Record<string, React.CSSProperties> = {
  * allowance.
  */
 export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
-    const { user, principal } = useOdinConnect();
+    const { user, principal, getToken } = useOdinConnect();
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
+    const [resolved, setResolved] = useState<Map<string, OdinToken>>(new Map());
     const [selectedId, setSelectedId] = useState('');
     const [amount, setAmount] = useState('');
     const [stage, setStage] = useState<Stage>('idle');
@@ -95,6 +96,42 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         }
         return map;
     }, [holdings]);
+
+    // Backfill metadata for internal-balance tokens the user no longer holds in
+    // their wallet (so they are absent from getTokens/byId). Without it the
+    // balance list would show the raw token id and an unscaled amount.
+    useEffect(() => {
+        let active = true;
+        const missing = balances
+            .map((b) => b.token)
+            .filter((id) => !byId.has(id) && !resolved.has(id));
+        if (missing.length === 0) {
+            return;
+        }
+        Promise.all(
+            missing.map((id) =>
+                getToken(id)
+                    .then((token) => [id, token] as const)
+                    .catch(() => null),
+            ),
+        ).then((entries) => {
+            if (!active) {
+                return;
+            }
+            setResolved((prev) => {
+                const next = new Map(prev);
+                for (const entry of entries) {
+                    if (entry !== null) {
+                        next.set(entry[0], entry[1]);
+                    }
+                }
+                return next;
+            });
+        });
+        return () => {
+            active = false;
+        };
+    }, [balances, byId, resolved, getToken]);
 
     const busy = stage === 'approving' || stage === 'crediting';
 
@@ -229,10 +266,10 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             ) : (
                 <ul style={styles.list}>
                     {balances.map((b) => {
-                        const meta = byId.get(b.token);
-                        const label = meta?.token.ticker ?? b.token;
-                        const value = meta
-                            ? formatTokenAmount(b.amount, meta.token.divisibility + meta.token.decimals)
+                        const token = byId.get(b.token)?.token ?? resolved.get(b.token);
+                        const label = token?.ticker ?? b.token;
+                        const value = token
+                            ? formatTokenAmount(b.amount, token.divisibility + token.decimals)
                             : b.amount.toString();
                         return (
                             <li key={b.token}>

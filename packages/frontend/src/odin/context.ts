@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { OdinConnectedUser, OdinUser } from 'odin-connect';
+import type { OdinConnectedUser, OdinToken, OdinUser } from 'odin-connect';
 
 /**
  * Auth lifecycle:
@@ -33,6 +33,13 @@ export interface OdinConnectContextValue {
     connect: () => Promise<void>;
     /** Clear the session (in this tab and all tabs on the same origin). */
     disconnect: () => void;
+    /**
+     * Fetch a token's metadata (ticker, divisibility, decimals, …) by Odin
+     * token id. Unlike `user.getTokens()` (which lists current wallet holdings),
+     * this resolves any token — needed to convert amounts for tokens held only
+     * as internal balances after a deposit.
+     */
+    getToken: (id: string) => Promise<OdinToken>;
 }
 
 export const OdinConnectContext = createContext<OdinConnectContextValue | null>(

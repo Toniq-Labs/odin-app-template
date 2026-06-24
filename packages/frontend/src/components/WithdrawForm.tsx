@@ -65,7 +65,7 @@ const styles: Record<string, React.CSSProperties> = {
  * back to the caller on the Odin ledger, then the balance refreshes.
  */
 export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
-    const { user } = useOdinConnect();
+    const { user, getToken } = useOdinConnect();
 
     const [meta, setMeta] = useState<Map<string, OdinTokenWithBalance>>(
         new Map(),
@@ -102,6 +102,43 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         };
     }, [user]);
 
+    // Backfill metadata for tokens held only as internal balances. After a
+    // deposit the user may no longer hold the token in their wallet, so it is
+    // absent from getTokens() above — without its divisibility/decimals the
+    // amount conversion would be wrong. Resolve each missing token by id.
+    useEffect(() => {
+        let active = true;
+        const missing = balances
+            .map((b) => b.token)
+            .filter((id) => !meta.has(id));
+        if (missing.length === 0) {
+            return;
+        }
+        Promise.all(
+            missing.map((id) =>
+                getToken(id)
+                    .then((token) => [id, token] as const)
+                    .catch(() => null),
+            ),
+        ).then((resolved) => {
+            if (!active) {
+                return;
+            }
+            setMeta((prev) => {
+                const next = new Map(prev);
+                for (const entry of resolved) {
+                    if (entry !== null) {
+                        next.set(entry[0], { token: entry[1], balance: 0n });
+                    }
+                }
+                return next;
+            });
+        });
+        return () => {
+            active = false;
+        };
+    }, [balances, meta, getToken]);
+
     const selected = useMemo(
         () => balances.find((b) => b.token === selectedTokenId) ?? null,
         [balances, selectedTokenId],
@@ -117,10 +154,12 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
     const busy = stage === 'approving' || stage === 'withdrawing';
 
     const fillMax = useCallback(() => {
-        if (selected) {
+        // Needs real divisibility/decimals; without meta the formatted value
+        // would be at the wrong scale.
+        if (selected && selectedMeta) {
             setAmount(formatTokenAmount(selected.amount, places));
         }
-    }, [selected, places]);
+    }, [selected, selectedMeta, places]);
 
     const withdraw = useCallback(async () => {
         setError(null);
@@ -138,13 +177,16 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             return;
         }
 
-        // Convert using token meta when known; otherwise treat the input as raw
-        // base units.
+        // Require token metadata before converting — its divisibility/decimals
+        // set the scale. Guessing (e.g. treating the input as raw base units)
+        // would withdraw the wrong amount.
+        if (!selectedMeta) {
+            setError('Token info still loading — try again in a moment.');
+            return;
+        }
         let raw: bigint;
         try {
-            raw = selectedMeta
-                ? OdinUtils.convertToOdinAmount(amount, selectedMeta.token)
-                : BigInt(amount);
+            raw = OdinUtils.convertToOdinAmount(amount, selectedMeta.token);
         } catch {
             setError('Invalid amount.');
             return;
@@ -247,7 +289,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     type="button"
                     style={styles.max}
                     onClick={fillMax}
-                    disabled={busy || selected === null}
+                    disabled={busy || selected === null || selectedMeta === undefined}
                 >
                     Max
                 </button>
