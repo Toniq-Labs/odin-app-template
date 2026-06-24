@@ -33,10 +33,16 @@ rustup target add wasm32-unknown-unknown
 ## Quick start
 
 ```sh
-pnpm install          # install workspace deps
+pnpm install          # install workspace deps (auto-installs the azle dfx extension if dfx is on PATH)
 dfx start --clean --background
 dfx deploy            # build + deploy canister and frontend
 ```
+
+> If `pnpm install` ran before `dfx` was installed, register the azle dfx extension manually:
+>
+> ```sh
+> pnpm --filter @odin-app/canister exec azle extension install
+> ```
 
 Frontend dev server:
 
