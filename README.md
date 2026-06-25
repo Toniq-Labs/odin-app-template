@@ -62,10 +62,16 @@ rustup target add wasm32-unknown-unknown
 ## Quick start
 
 ```sh
-pnpm install          # install workspace deps
+pnpm install          # install workspace deps (auto-installs the azle dfx extension if dfx is on PATH)
 dfx start --clean --background
 dfx deploy            # build + deploy canister and frontend
 ```
+
+> If `pnpm install` ran before `dfx` was installed, register the azle dfx extension manually:
+>
+> ```sh
+> pnpm --filter @odin-app/canister exec azle extension install
+> ```
 
 Frontend dev server:
 
@@ -93,6 +99,16 @@ pnpm dev:frontend
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
 | `getBalances`   | query  | All of the caller's `(token, balance)` pairs.                     |
 | `getOwner`      | query  | The configured owner principal, or empty if not yet initialized.  |
+| `icrc28_trusted_origins` | update | [ICRC-28](https://github.com/dfinity/wg-identity-authentication) trusted origins — the web origins allowed to request signed calls. Odin Connect calls this before issuing a delegation and refuses auth if your app's origin is not listed. |
+
+> **ICRC-28 / Odin Connect auth:** the trusted origins are configured in
+> `TRUSTED_ORIGINS` in
+> [`packages/canister/src/index.ts`](packages/canister/src/index.ts). Each entry
+> must be a bare origin (`scheme://host[:port]`, no trailing slash, no path);
+> https only, except `http://localhost` in dev. The signer does an exact string
+> match. **Edit this list to your deployed frontend origin before going live** —
+> a wrong or missing origin fails login silently. It must be `update` (not
+> `query`): the signer issues a replicated call so the response is certified.
 
 Tokens are identified by their **Odin token id** (text), not an ICRC ledger
 principal — every Odin token shares one ledger and is addressed by subaccount
@@ -101,7 +117,6 @@ stable memory, so they survive upgrades.
 
 ### Withdrawal fees
 
-The Odin ledger charges a flat **BTC fee (100 sats) to the sender** on every
 transfer. On withdraw the sender is the app canister, so the canister pays that
 fee in BTC.
 
@@ -150,7 +165,17 @@ cover both. See `ODIN_BTC_FEE` in
 4. Note the canister IDs printed on deploy; the frontend reads them from the
    generated `.env` (`output_env_file` in `dfx.json`).
 
-5. **No canister BTC float needed** for withdrawals — the withdrawer pays the
+5. **Set your trusted origins.** Edit `TRUSTED_ORIGINS` in
+   [`packages/canister/src/index.ts`](packages/canister/src/index.ts) to the
+   origin your frontend is served from (e.g. your asset-canister URL or custom
+   domain), then redeploy. Odin Connect login fails until your origin is listed.
+   Verify with:
+
+   ```sh
+   dfx canister call canister icrc28_trusted_origins '()' --network ic
+   ```
+
+6. **No canister BTC float needed** for withdrawals — the withdrawer pays the
    Odin ledger fee at withdraw time (see [Withdrawal fees](#withdrawal-fees)).
    Just confirm `ODIN_BTC_FEE` matches the live ledger fee before going live.
 
