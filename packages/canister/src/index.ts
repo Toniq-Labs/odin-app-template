@@ -13,6 +13,30 @@ import { odinPullToken, odinSendToken } from './odin';
 import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
 
 /**
+ * ⚠️ EDIT BEFORE DEPLOY — must list the exact origin(s) your frontend is served
+ * from, or Odin Connect login will fail with "origin is not trusted".
+ *
+ * ICRC-28 trusted origins: the web origins allowed to request signed calls to
+ * this canister on a user's behalf. Before issuing a delegation, Odin Connect
+ * (the signer) calls `icrc28_trusted_origins` on every target canister and
+ * refuses the whole auth if the relying-party origin is absent — or if the
+ * endpoint is missing entirely. The origin is the page that opened the signer,
+ * NOT this canister's own URL.
+ *
+ * Each entry MUST be a bare origin: `scheme://host[:port]`, no trailing slash,
+ * no path. https only, except `http://localhost`/`127.0.0.1` for local dev.
+ * The signer does an exact string match, so e.g. a trailing `/` will not match.
+ */
+const TRUSTED_ORIGINS: string[] = [
+    // Local dev — Vite dev server (default port).
+    'http://localhost:5173',
+    // Local dev — Vite dev server (fallback port when 5173 is taken).
+    'http://localhost:5174',
+    // Production — Netlify-hosted frontend.
+    'https://odin-app-template.netlify.app',
+];
+
+/**
  * odin-app-template reference canister — multi-token internal ledger.
  *
  * Tracks an internal balance per (principal, token) pair, backed by stable
@@ -88,6 +112,13 @@ export default class {
      * Debit the caller's internal balance and send `amount` of the Odin token
      * `tokenId` back to them via the Odin ledger (icrc1_transfer).
      *
+     * NOTE (fees): the Odin ledger charges a flat BTC fee (100 sats) to the
+     * SENDER on every transfer — here that sender is this canister. So the
+     * canister must hold a small BTC float on the Odin ledger or withdrawals
+     * trap with error 910. This template subsidizes the fee from that float for
+     * simplicity; a production app should charge the withdrawer instead (track a
+     * per-user BTC balance and debit the fee on withdraw). See README.
+     *
      * ⚠️ AI-GUARD: Checks-effects-interactions. The balance is debited and
      * persisted BEFORE the cross-canister transfer await. If the transfer
      * fails the balance is refunded. Do not reorder: moving the transfer
@@ -144,5 +175,21 @@ export default class {
     getOwner(): [Principal] | [] {
         const owner = this.config.get('owner');
         return owner === undefined ? [] : [Principal.fromText(owner)];
+    }
+
+    /**
+     * ICRC-28: the web origins this canister trusts to request signed calls on
+     * a user's behalf. Odin Connect calls this before issuing a delegation and
+     * refuses the auth if the relying-party origin is not listed. Configure the
+     * list in `TRUSTED_ORIGINS` above.
+     *
+     * MUST be `@update`, not `@query`: the signer issues a replicated call so
+     * the response is consensus-certified — a query reply comes from a single
+     * replica and is spoofable, so signers reject it. Returns the record form
+     * `{ trusted_origins }` the ICRC-28 standard (and the signer) expects.
+     */
+    @update([], IDL.Record({ trusted_origins: IDL.Vec(IDL.Text) }))
+    icrc28_trusted_origins(): { trusted_origins: string[] } {
+        return { trusted_origins: TRUSTED_ORIGINS };
     }
 }
