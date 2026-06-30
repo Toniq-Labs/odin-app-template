@@ -117,20 +117,30 @@ stable memory, so they survive upgrades.
 
 ### Withdrawal fees
 
-The Odin ledger charges a flat **BTC fee (100 sats) to the sender** on every
-transfer. On withdraw the sender is the app canister, so the canister must hold
-a small BTC float on the Odin ledger — otherwise withdrawals trap with
-`error 910: Insufficient BTC funds to cover transfer fee`.
+transfer. On withdraw the sender is the app canister, so the canister pays that
+fee in BTC.
 
-This template **subsidizes** the fee from that float for simplicity. Fund the
-canister by transferring some sats to its principal from the Odin app, then top
-it up as needed.
+This template makes the **withdrawer pay** the fee — no maintainer-funded float,
+not griefable. The flow:
 
-> **Production note:** subsidizing is griefable (spam withdrawals drain the
-> float). A production app should make the **withdrawer pay** — track a per-user
-> BTC balance in the internal ledger and debit the 100-sat fee on each withdraw
-> (refund on failure, same as the token debit). See the `NOTE (fees)` comment on
-> `withdraw` in [`packages/canister/src/index.ts`](packages/canister/src/index.ts).
+1. On withdraw the frontend requests an ICRC-2 BTC approval (`icrcApprove`,
+   token `"btc"`) for **2× the fee**.
+2. `withdraw` pulls the fee from the caller's BTC (`icrc2_transfer_from`), then
+   sends the tokens. The pulled BTC funds the outbound transfer's own fee, so on
+   success the canister **nets zero BTC and needs no float**. If the token send
+   fails after the fee pull, the fee is forfeited (not refunded — returning it
+   would cost another BTC transfer), leaving the canister a small BTC surplus.
+
+Why 2×: pulling BTC is itself a transfer, and the ledger charges the caller a
+fee on that pull too (debited from `from`, per ICRC-2). So the withdrawer pays
+the fee twice — once for the pull, once funding the send — and the approval must
+cover both. See `ODIN_BTC_FEE` in
+[`packages/canister/src/odin.ts`](packages/canister/src/odin.ts) and
+[`packages/frontend/src/lib/fees.ts`](packages/frontend/src/lib/fees.ts).
+
+> **Verify before mainnet:** `ODIN_BTC_FEE` is set to the documented 100 sats.
+> Confirm it matches the live ledger fee — too low traps the first withdraw with
+> `error 910`; too high leaves the canister a small BTC surplus.
 
 ## Deploy to mainnet
 
@@ -165,10 +175,9 @@ it up as needed.
    dfx canister call canister icrc28_trusted_origins '()' --network ic
    ```
 
-6. **Fund the canister with BTC** so withdrawals can pay the Odin ledger fee
-   (see [Withdrawal fees](#withdrawal-fees)). From the Odin app, transfer some
-   sats to the app canister's principal; otherwise `withdraw` traps with
-   `error 910`.
+6. **No canister BTC float needed** for withdrawals — the withdrawer pays the
+   Odin ledger fee at withdraw time (see [Withdrawal fees](#withdrawal-fees)).
+   Just confirm `ODIN_BTC_FEE` matches the live ledger fee before going live.
 
 ## How to extend
 

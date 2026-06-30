@@ -104,6 +104,11 @@ export function OdinConnectProvider({ children }: { children: ReactNode }) {
         setStatus('disconnected');
     }, [odin]);
 
+    // Resolve token metadata by id via the SDK's public token endpoint. Works
+    // for any token, including those the user no longer holds in their wallet
+    // (e.g. fully deposited into the app canister).
+    const getToken = useCallback((id: string) => odin.api.getToken(id), [odin]);
+
     const value = useMemo(
         () => ({
             status,
@@ -113,8 +118,9 @@ export function OdinConnectProvider({ children }: { children: ReactNode }) {
             error,
             connect,
             disconnect,
+            getToken,
         }),
-        [status, principal, profile, error, connect, disconnect],
+        [status, principal, profile, error, connect, disconnect, getToken],
     );
 
     return (

@@ -9,7 +9,12 @@ import {
 } from 'azle';
 import { Principal } from '@dfinity/principal';
 
-import { odinPullToken, odinSendToken } from './odin';
+import {
+    ODIN_BTC_FEE,
+    ODIN_BTC_TOKEN_ID,
+    odinPullToken,
+    odinSendToken,
+} from './odin';
 import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
 
 /**
@@ -112,17 +117,23 @@ export default class {
      * Debit the caller's internal balance and send `amount` of the Odin token
      * `tokenId` back to them via the Odin ledger (icrc1_transfer).
      *
-     * NOTE (fees): the Odin ledger charges a flat BTC fee (100 sats) to the
-     * SENDER on every transfer — here that sender is this canister. So the
-     * canister must hold a small BTC float on the Odin ledger or withdrawals
-     * trap with error 910. This template subsidizes the fee from that float for
-     * simplicity; a production app should charge the withdrawer instead (track a
-     * per-user BTC balance and debit the fee on withdraw). See README.
+     * FEES (withdrawer pays): the Odin ledger charges a flat BTC fee to the
+     * SENDER on every transfer. The outbound token transfer below is sent by
+     * this canister, so the canister pays that fee in BTC. Instead of holding a
+     * maintainer-seeded BTC float (subsidizing — griefable, drains under spam),
+     * this canister pulls the fee from the withdrawer first: the caller
+     * pre-approves BTC (>= 2x `ODIN_BTC_FEE`) via the Odin `icrcApprove` flow,
+     * and `withdraw` pulls `ODIN_BTC_FEE` BTC into this canister to fund the
+     * outbound fee. The pulled BTC cancels the outbound fee, so on success the
+     * canister nets zero BTC and needs no float. A failed token send after the
+     * fee pull leaves the pulled fee as canister surplus (forfeited below, not
+     * refunded). See odin.ts and README.
      *
      * ⚠️ AI-GUARD: Checks-effects-interactions. The balance is debited and
-     * persisted BEFORE the cross-canister transfer await. If the transfer
-     * fails the balance is refunded. Do not reorder: moving the transfer
-     * before the debit opens a reentrancy window for double-withdrawal.
+     * persisted BEFORE any cross-canister transfer await. If a transfer fails
+     * the balance is refunded. Do not reorder: moving a transfer before the
+     * debit opens a reentrancy window for double-withdrawal. The fee pull must
+     * stay BEFORE the token send so no tokens leave for an uncollected fee.
      */
     @update([IDL.Text, IDL.Nat], IDL.Nat)
     async withdraw(tokenId: string, amount: bigint): Promise<bigint> {
@@ -136,10 +147,25 @@ export default class {
         const next = debit(current, amount); // throws on insufficient funds
         this.ledger.insert(key, next);
 
-        // INTERACTION: send tokens out. Refund on any failure.
+        // INTERACTION: collect the BTC fee from the withdrawer, then send the
+        // tokens out. Refund the internal debit on any failure.
         try {
+            // Fee first: pull the flat BTC fee from the caller's pre-approved
+            // allowance. If this throws (no/low approval, insufficient BTC) no
+            // tokens have left, and the debit is refunded below.
+            await odinPullToken(
+                ODIN_BTC_TOKEN_ID,
+                caller,
+                canisterSelf(),
+                ODIN_BTC_FEE,
+            );
+            // Then the token send. The canister pays the outbound BTC fee out of
+            // the BTC just pulled, so it nets zero.
             await odinSendToken(tokenId, caller, amount);
         } catch (error) {
+            // Refund the token debit. A fee already pulled before a later
+            // failure is NOT refunded — returning it would cost another BTC
+            // transfer fee; the withdrawer forfeits the fee on a failed send.
             const afterAwait = this.ledger.get(key) ?? 0n;
             this.ledger.insert(key, credit(afterAwait, amount));
             throw error;
