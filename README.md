@@ -26,7 +26,7 @@ flowchart LR
     popup -->|icrc2_approve| odin
     fe -->|"deposit / withdraw / getBalances"| can
     can --> ledger
-    can -->|"icrc2_transfer_from (deposit)<br/>icrc1_transfer (withdraw)"| odin
+    can -->|"icrc2_transfer_from (deposit + withdraw fee)<br/>icrc1_transfer (withdraw)"| odin
 ```
 
 **Deposit**: the user approves the app canister as an ICRC-2 spender through the
@@ -36,8 +36,10 @@ balance. It is permissionless and self-verifying — a credit is only recorded f
 funds that actually settled into the canister.
 
 **Withdraw**: the user calls `withdraw`; the canister debits the internal
-balance (persisted *before* the transfer await) and sends the tokens back out on
-the Odin ledger (`icrc1_transfer`), refunding on failure.
+balance (persisted *before* the transfer await), pulls the BTC ledger fee from
+the withdrawer (`icrc2_transfer_from`, see [Withdrawal fees](#withdrawal-fees)),
+then sends the tokens back out on the Odin ledger (`icrc1_transfer`), refunding
+the debit on failure.
 
 ## Layout
 
