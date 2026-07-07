@@ -82,13 +82,13 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             return;
         }
         user
-            .getTokens({ page: 1, limit: 50 })
+            .getBalances({ page: 1, limit: 50 })
             .then((result) => {
                 if (!active) {
                     return;
                 }
                 setHoldings(
-                    result.data.map((d) => ({ token: d.token, balance: d.balance })),
+                    result.map((b) => ({ token: b, balance: BigInt(b.balance) })),
                 );
             })
             .catch(() => {
@@ -110,7 +110,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
 
     // Backfill metadata for tokens held only as internal balances. After a
     // deposit the user may no longer hold the token in their wallet, so it is
-    // absent from getTokens() above — without its divisibility/decimals the
+    // absent from getBalances() above — without its divisibility/decimals the
     // amount conversion would be wrong. Resolve each missing token by id. Kept
     // in separate state so a later holdings refresh cannot wipe it.
     useEffect(() => {
@@ -133,12 +133,17 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             }
             setResolved((prev) => {
                 const next = new Map(prev);
+                let changed = false;
                 for (const entry of entries) {
                     if (entry !== null) {
                         next.set(entry[0], entry[1]);
+                        changed = true;
                     }
                 }
-                return next;
+                // Keep the same reference when nothing resolved, otherwise the
+                // new Map re-triggers this effect and re-fetches the same
+                // (failing) ids forever.
+                return changed ? next : prev;
             });
         });
         return () => {
