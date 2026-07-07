@@ -77,8 +77,8 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             return;
         }
         try {
-            const result = await user.getTokens({ page: 1, limit: 50 });
-            setHoldings(result.data.map((d) => ({ token: d.token, balance: d.balance })));
+            const result = await user.getBalances({ page: 1, limit: 50 });
+            setHoldings(result.map((b) => ({ token: b, balance: b.balance })));
         } catch (err) {
             setError(`Failed to load tokens: ${toMessage(err)}`);
         }
@@ -98,7 +98,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
     }, [holdings]);
 
     // Backfill metadata for internal-balance tokens the user no longer holds in
-    // their wallet (so they are absent from getTokens/byId). Without it the
+    // their wallet (so they are absent from getBalances/byId). Without it the
     // balance list would show the raw token id and an unscaled amount.
     useEffect(() => {
         let active = true;
