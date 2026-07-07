@@ -78,7 +78,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         }
         try {
             const result = await user.getBalances({ page: 1, limit: 50 });
-            setHoldings(result.map((b) => ({ token: b, balance: b.balance })));
+            setHoldings(result.map((b) => ({ token: b, balance: BigInt(b.balance) })));
         } catch (err) {
             setError(`Failed to load tokens: ${toMessage(err)}`);
         }

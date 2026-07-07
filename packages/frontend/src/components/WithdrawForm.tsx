@@ -88,7 +88,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     return;
                 }
                 setHoldings(
-                    result.map((b) => ({ token: b, balance: b.balance })),
+                    result.map((b) => ({ token: b, balance: BigInt(b.balance) })),
                 );
             })
             .catch(() => {
