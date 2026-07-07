@@ -133,12 +133,17 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             }
             setResolved((prev) => {
                 const next = new Map(prev);
+                let changed = false;
                 for (const entry of entries) {
                     if (entry !== null) {
                         next.set(entry[0], entry[1]);
+                        changed = true;
                     }
                 }
-                return next;
+                // Keep the same reference when nothing resolved, otherwise the
+                // new Map re-triggers this effect and re-fetches the same
+                // (failing) ids forever.
+                return changed ? next : prev;
             });
         });
         return () => {
