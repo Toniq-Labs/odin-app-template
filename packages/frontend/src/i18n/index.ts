@@ -25,6 +25,13 @@ type LocaleCatalog = DeepStringify<typeof en>;
 const enCatalog: LocaleCatalog = en;
 const zhCatalog: LocaleCatalog = zh;
 
+// The guards above enforce `each catalog ⊇ en`, catching *missing* keys. This
+// reverse check enforces `en ⊇ each catalog`: assigning `en` to a catalog's own
+// key shape fails typecheck if that catalog carries an *extra* key `en` lacks.
+// Together the two directions guarantee identical key sets — no orphan keys.
+const _zhParity: DeepStringify<typeof zh> = en;
+void _zhParity;
+
 const STORAGE_KEY = 'odin-app-locale';
 
 void i18n

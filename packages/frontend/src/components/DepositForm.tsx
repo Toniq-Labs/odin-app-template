@@ -227,9 +227,9 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                     disabled={busy}
                 >
                     <option value="">{t('deposit.selectToken')}</option>
-                    {depositable.map((t) => (
-                        <option key={t.token.id} value={t.token.id}>
-                            {t.token.ticker} ({formatTokenAmount(t.balance, t.token.divisibility + t.token.decimals)})
+                    {depositable.map(({ token, balance }) => (
+                        <option key={token.id} value={token.id}>
+                            {token.ticker} ({formatTokenAmount(balance, token.divisibility + token.decimals)})
                         </option>
                     ))}
                 </select>
