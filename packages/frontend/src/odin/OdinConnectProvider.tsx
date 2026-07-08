@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { OdinConnect } from 'odin-connect';
 import type { OdinConnectedUser, OdinUser } from 'odin-connect';
 
@@ -16,11 +17,11 @@ type OdinEnv = 'prod' | 'dev' | 'local';
 const APP_NAME = import.meta.env.VITE_ODIN_APP_NAME ?? 'Odin App Template';
 const APP_ENV = (import.meta.env.VITE_ODIN_ENV ?? 'prod') as OdinEnv;
 
-function toMessage(error: unknown): string {
+function toMessage(error: unknown, fallback: string): string {
     if (error instanceof Error) {
         return error.message;
     }
-    return typeof error === 'string' ? error : 'Failed to connect to Odin';
+    return typeof error === 'string' ? error : fallback;
 }
 
 /**
@@ -30,6 +31,7 @@ function toMessage(error: unknown): string {
  * React.
  */
 export function OdinConnectProvider({ children }: { children: ReactNode }) {
+    const { t } = useTranslation();
     // One SDK instance for the app's lifetime.
     const odin = useMemo(
         () => new OdinConnect({ name: APP_NAME, env: APP_ENV }),
@@ -90,10 +92,10 @@ export function OdinConnectProvider({ children }: { children: ReactNode }) {
             userRef.current = null;
             setPrincipal(null);
             setProfile(null);
-            setError(toMessage(err));
+            setError(toMessage(err, t('errors.connectFailed')));
             setStatus('error');
         }
-    }, [odin, adopt]);
+    }, [odin, adopt, t]);
 
     const disconnect = useCallback(() => {
         odin.disconnect();
