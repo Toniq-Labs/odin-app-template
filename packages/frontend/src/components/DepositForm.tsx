@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
@@ -16,11 +17,11 @@ interface DepositFormProps {
     refresh: () => Promise<void>;
 }
 
-function toMessage(error: unknown): string {
+function toMessage(error: unknown, fallback: string): string {
     if (error instanceof Error) {
         return error.message;
     }
-    return typeof error === 'string' ? error : 'Unexpected error';
+    return typeof error === 'string' ? error : fallback;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -59,6 +60,7 @@ const styles: Record<string, React.CSSProperties> = {
  * allowance.
  */
 export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
+    const { t } = useTranslation();
     const { user, principal, getToken } = useOdinConnect();
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
@@ -80,9 +82,9 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             const result = await user.getBalances({ page: 1, limit: 50 });
             setHoldings(result.map((b) => ({ token: b, balance: BigInt(b.balance) })));
         } catch (err) {
-            setError(`Failed to load tokens: ${toMessage(err)}`);
+            setError(t('deposit.errors.loadTokens', { message: toMessage(err, t('errors.unexpected')) }));
         }
-    }, [user]);
+    }, [user, t]);
 
     useEffect(() => {
         void loadHoldings();
@@ -144,16 +146,16 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         setError(null);
 
         if (APP_CANISTER_ID === '') {
-            setError('No app canister configured (set VITE_APP_CANISTER_ID).');
+            setError(t('errors.noCanisterConfigured'));
             return;
         }
         if (user === null || principal === null) {
-            setError('Not connected.');
+            setError(t('errors.notConnected'));
             return;
         }
-        const holding = depositable.find((t) => t.token.id === selectedId);
+        const holding = depositable.find((h) => h.token.id === selectedId);
         if (!holding) {
-            setError('Select a token to deposit.');
+            setError(t('errors.selectTokenDeposit'));
             return;
         }
 
@@ -161,11 +163,11 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         try {
             raw = OdinUtils.convertToOdinAmount(amount, holding.token);
         } catch {
-            setError('Invalid amount.');
+            setError(t('errors.invalidAmount'));
             return;
         }
         if (raw <= 0n) {
-            setError('Amount must be greater than zero.');
+            setError(t('errors.amountGreaterThanZero'));
             return;
         }
 
@@ -182,12 +184,12 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             });
         } catch (err) {
             setStage('idle');
-            setError(`Approval failed: ${toMessage(err)}`);
+            setError(t('deposit.errors.approvalFailed', { message: toMessage(err, t('errors.unexpected')) }));
             return;
         }
         if (!approved) {
             setStage('idle');
-            setError('Approval cancelled or rejected.');
+            setError(t('errors.approvalRejected'));
             return;
         }
 
@@ -195,7 +197,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         //    ledger. deposit() runs icrc2_transfer_from then credits the caller.
         if (actor === null) {
             setStage('idle');
-            setError('Canister unavailable — reconnect to enable deposits.');
+            setError(t('errors.canisterUnavailableDeposit'));
             return;
         }
         setStage('crediting');
@@ -203,7 +205,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             await actor.deposit(holding.token.id, raw);
         } catch (err) {
             setStage('idle');
-            setError(`Deposit failed: ${toMessage(err)}`);
+            setError(t('deposit.errors.depositFailed', { message: toMessage(err, t('errors.unexpected')) }));
             return;
         }
 
@@ -211,11 +213,11 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         setAmount('');
         await refresh();
         void loadHoldings();
-    }, [user, principal, actor, depositable, selectedId, amount, refresh, loadHoldings]);
+    }, [user, principal, actor, depositable, selectedId, amount, refresh, loadHoldings, t]);
 
     return (
         <section style={styles.card}>
-            <h2 style={{ marginTop: 0 }}>Deposit</h2>
+            <h2 style={{ marginTop: 0 }}>{t('deposit.heading')}</h2>
 
             <div style={styles.row}>
                 <select
@@ -224,7 +226,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                     onChange={(e) => setSelectedId(e.target.value)}
                     disabled={busy}
                 >
-                    <option value="">Select token…</option>
+                    <option value="">{t('deposit.selectToken')}</option>
                     {depositable.map((t) => (
                         <option key={t.token.id} value={t.token.id}>
                             {t.token.ticker} ({formatTokenAmount(t.balance, t.token.divisibility + t.token.decimals)})
@@ -236,7 +238,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                     style={styles.input}
                     type="text"
                     inputMode="decimal"
-                    placeholder="Amount"
+                    placeholder={t('deposit.amountPlaceholder')}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     disabled={busy}
@@ -249,10 +251,10 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                     disabled={busy || selectedId === '' || amount === ''}
                 >
                     {stage === 'approving'
-                        ? 'Awaiting approval…'
+                        ? t('deposit.awaitingApproval')
                         : stage === 'crediting'
-                          ? 'Crediting…'
-                          : 'Deposit'}
+                          ? t('deposit.crediting')
+                          : t('deposit.submit')}
                 </button>
             </div>
 
@@ -262,12 +264,12 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                 </div>
             ) : null}
             {stage === 'done' && error === null ? (
-                <div style={styles.ok}>Deposit credited.</div>
+                <div style={styles.ok}>{t('deposit.credited')}</div>
             ) : null}
 
-            <h3 style={{ marginBottom: 0 }}>Internal balances</h3>
+            <h3 style={{ marginBottom: 0 }}>{t('deposit.balancesHeading')}</h3>
             {balances.length === 0 ? (
-                <p style={styles.note}>No internal balances yet.</p>
+                <p style={styles.note}>{t('deposit.noBalances')}</p>
             ) : (
                 <ul style={styles.list}>
                     {balances.map((b) => {
@@ -286,10 +288,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             )}
 
             <p style={styles.note}>
-                Note: <code>deposit</code> pulls the approved funds via
-                <code> icrc2_transfer_from</code> and credits your balance in one
-                call — the credit is backed by tokens the canister actually
-                moved, so no trusted minter is required.
+                <Trans i18nKey="deposit.note" components={[<code key="0" />, <code key="1" />]} />
             </p>
         </section>
     );

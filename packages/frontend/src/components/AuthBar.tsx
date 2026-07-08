@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useOdinConnect } from '../odin/useOdinConnect';
 
 /** Shorten a principal for display: `abcde-…-xyz12`. */
@@ -60,11 +62,12 @@ const styles: Record<string, React.CSSProperties> = {
  * authenticated.
  */
 export function AuthBar() {
+    const { t } = useTranslation();
     const { status, principal, profile, error, connect, disconnect } =
         useOdinConnect();
 
     if (status === 'restoring') {
-        return <div style={styles.bar}>Restoring session…</div>;
+        return <div style={styles.bar}>{t('auth.restoring')}</div>;
     }
 
     if (status === 'connected' && principal !== null) {
@@ -79,7 +82,7 @@ export function AuthBar() {
                 ) : (
                     <div style={styles.avatar} aria-hidden="true" />
                 )}
-                <span style={styles.name}>{profile?.username ?? 'Connected'}</span>
+                <span style={styles.name}>{profile?.username ?? t('auth.connected')}</span>
                 <span style={styles.principal} title={principal}>
                     {shortPrincipal(principal)}
                 </span>
@@ -88,7 +91,7 @@ export function AuthBar() {
                     style={styles.secondary}
                     onClick={disconnect}
                 >
-                    Disconnect
+                    {t('auth.disconnect')}
                 </button>
             </div>
         );
@@ -103,7 +106,7 @@ export function AuthBar() {
                 onClick={() => void connect()}
                 disabled={connecting}
             >
-                {connecting ? 'Connecting…' : 'Connect with Odin'}
+                {connecting ? t('auth.connecting') : t('auth.connect')}
             </button>
             {status === 'error' && error !== null ? (
                 <span style={styles.error} role="alert">

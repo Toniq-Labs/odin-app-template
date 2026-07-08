@@ -199,3 +199,22 @@ CORE` markers in
 [`packages/frontend/src`](packages/frontend/src) are free to modify. Auth and
 flows are built on the [odin-connect](https://www.npmjs.com/package/odin-connect)
 SDK.
+
+**Add a language (i18n)** — the frontend is localized with
+[react-i18next](https://react.i18next.com/). English (`en`) is the default and
+the source of truth for keys; Simplified Chinese (`zh`) ships alongside it.
+Locale detection is `localStorage` → browser language → `en`, and the choice
+persists across reloads. To add a locale (e.g. Japanese, `ja`):
+
+1. Copy [`src/i18n/locales/en.json`](packages/frontend/src/i18n/locales/en.json)
+   to `src/i18n/locales/ja.json` and translate the values (keep the keys).
+2. In [`src/i18n/index.ts`](packages/frontend/src/i18n/index.ts): import the new
+   catalog, add it to `resources`, and add `'ja'` to `SUPPORTED_LOCALES`.
+3. Add a `language.ja` label to every locale catalog (the switcher labels each
+   option with `t('language.<locale>')`).
+
+`en.json` is the key source of truth: every other catalog is checked against it
+at compile time (a missing or misspelled key fails `pnpm typecheck`), so keep
+the key sets identical. The switcher in
+[`src/components/LanguageSwitcher.tsx`](packages/frontend/src/components/LanguageSwitcher.tsx)
+renders one option per `SUPPORTED_LOCALES` entry automatically.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
@@ -21,11 +22,11 @@ interface WithdrawFormProps {
     refresh: () => Promise<void>;
 }
 
-function toMessage(error: unknown): string {
+function toMessage(error: unknown, fallback: string): string {
     if (error instanceof Error) {
         return error.message;
     }
-    return typeof error === 'string' ? error : 'Unexpected error';
+    return typeof error === 'string' ? error : fallback;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -65,6 +66,7 @@ const styles: Record<string, React.CSSProperties> = {
  * back to the caller on the Odin ledger, then the balance refreshes.
  */
 export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
+    const { t } = useTranslation();
     const { user, getToken } = useOdinConnect();
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
@@ -177,15 +179,15 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         setError(null);
 
         if (APP_CANISTER_ID === '') {
-            setError('No app canister configured (set VITE_APP_CANISTER_ID).');
+            setError(t('errors.noCanisterConfigured'));
             return;
         }
         if (actor === null) {
-            setError('Canister unavailable — reconnect to enable withdrawals.');
+            setError(t('errors.canisterUnavailableWithdraw'));
             return;
         }
         if (selected === null) {
-            setError('Select a token to withdraw.');
+            setError(t('errors.selectTokenWithdraw'));
             return;
         }
 
@@ -193,26 +195,26 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         // set the scale. Guessing (e.g. treating the input as raw base units)
         // would withdraw the wrong amount.
         if (!selectedToken) {
-            setError('Token info still loading — try again in a moment.');
+            setError(t('errors.tokenInfoLoading'));
             return;
         }
         let raw: bigint;
         try {
             raw = OdinUtils.convertToOdinAmount(amount, selectedToken);
         } catch {
-            setError('Invalid amount.');
+            setError(t('errors.invalidAmount'));
             return;
         }
         if (raw <= 0n) {
-            setError('Amount must be greater than zero.');
+            setError(t('errors.amountGreaterThanZero'));
             return;
         }
         if (raw > selected.amount) {
-            setError('Insufficient internal balance.');
+            setError(t('errors.insufficientBalance'));
             return;
         }
         if (user === null) {
-            setError('Not connected.');
+            setError(t('errors.notConnected'));
             return;
         }
 
@@ -230,12 +232,12 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             });
         } catch (err) {
             setStage('idle');
-            setError(`BTC fee approval failed: ${toMessage(err)}`);
+            setError(t('withdraw.errors.feeApprovalFailed', { message: toMessage(err, t('errors.unexpected')) }));
             return;
         }
         if (!approved) {
             setStage('idle');
-            setError('BTC fee approval cancelled or rejected.');
+            setError(t('withdraw.errors.feeApprovalRejected'));
             return;
         }
 
@@ -248,18 +250,18 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             setStage('idle');
             // Canister rejects overdrafts; an Odin ledger transfer failure
             // refunds the debited balance and surfaces here too.
-            setError(`Withdraw failed: ${toMessage(err)}`);
+            setError(t('withdraw.errors.withdrawFailed', { message: toMessage(err, t('errors.unexpected')) }));
             return;
         }
 
         setStage('done');
         setAmount('');
         await refresh();
-    }, [actor, selected, selectedToken, amount, refresh, user]);
+    }, [actor, selected, selectedToken, amount, refresh, user, t]);
 
     return (
         <section style={styles.card}>
-            <h2 style={{ marginTop: 0 }}>Withdraw</h2>
+            <h2 style={{ marginTop: 0 }}>{t('withdraw.heading')}</h2>
 
             <div style={styles.row}>
                 <select
@@ -271,7 +273,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     }}
                     disabled={busy}
                 >
-                    <option value="">Select token…</option>
+                    <option value="">{t('withdraw.selectToken')}</option>
                     {balances.map((b) => {
                         const m = byId.get(b.token)?.token ?? resolved.get(b.token);
                         const label = m?.ticker ?? b.token;
@@ -291,7 +293,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     style={styles.input}
                     type="text"
                     inputMode="decimal"
-                    placeholder="Amount"
+                    placeholder={t('withdraw.amountPlaceholder')}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     disabled={busy}
@@ -303,7 +305,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     onClick={fillMax}
                     disabled={busy || selected === null || selectedToken === undefined}
                 >
-                    Max
+                    {t('withdraw.max')}
                 </button>
 
                 <button
@@ -313,17 +315,15 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     disabled={busy || selectedTokenId === '' || amount === ''}
                 >
                     {stage === 'approving'
-                        ? 'Awaiting BTC approval…'
+                        ? t('withdraw.awaitingApproval')
                         : stage === 'withdrawing'
-                          ? 'Withdrawing…'
-                          : 'Withdraw'}
+                          ? t('withdraw.withdrawing')
+                          : t('withdraw.submit')}
                 </button>
             </div>
 
             <p style={styles.note}>
-                Network fee: ~{WITHDRAW_FEE_SATS} sats in BTC. You approve BTC on
-                withdraw so the canister can cover the Odin ledger transfer fee —
-                no canister float needed.
+                {t('withdraw.feeNote', { sats: WITHDRAW_FEE_SATS })}
             </p>
 
             {error !== null ? (
@@ -332,13 +332,11 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                 </div>
             ) : null}
             {stage === 'done' && error === null ? (
-                <div style={styles.ok}>Withdrawal sent.</div>
+                <div style={styles.ok}>{t('withdraw.sent')}</div>
             ) : null}
 
             {balances.length === 0 ? (
-                <p style={styles.note}>
-                    No internal balances to withdraw. Deposit some tokens first.
-                </p>
+                <p style={styles.note}>{t('withdraw.noBalances')}</p>
             ) : null}
         </section>
     );

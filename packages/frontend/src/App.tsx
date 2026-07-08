@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next';
+
 import { AuthBar } from './components/AuthBar';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { DepositForm } from './components/DepositForm';
 import { WithdrawForm } from './components/WithdrawForm';
 import { useOdinConnect } from './odin/useOdinConnect';
@@ -6,6 +9,7 @@ import { useCanisterActor } from './canister/useCanisterActor';
 import { useInternalBalances } from './canister/useInternalBalances';
 
 export function App() {
+    const { t } = useTranslation();
     const { status } = useOdinConnect();
     // Internal balances live here so deposit and withdraw share one source of
     // truth — a deposit refresh immediately updates the withdraw selector.
@@ -22,15 +26,20 @@ export function App() {
                     gap: '1rem',
                 }}
             >
-                <h1 style={{ margin: 0 }}>odin-app-template</h1>
-                <AuthBar />
+                <h1 style={{ margin: 0 }}>{t('app.title')}</h1>
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                    }}
+                >
+                    <LanguageSwitcher />
+                    <AuthBar />
+                </div>
             </header>
 
-            <p>
-                Reference canister app for building on Odin Fun. Auth is wired up
-                with Odin Connect — deposit/withdraw flows and the multi-token
-                ledger UI land in later subtasks.
-            </p>
+            <p>{t('app.intro')}</p>
 
             {status === 'connected' ? (
                 <>
@@ -38,7 +47,7 @@ export function App() {
                     <WithdrawForm actor={actor} balances={balances} refresh={refresh} />
                 </>
             ) : (
-                <p>Connect with Odin to deposit, withdraw and view your balances.</p>
+                <p>{t('app.connectPrompt')}</p>
             )}
         </main>
     );

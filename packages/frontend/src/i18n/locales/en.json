@@ -1,0 +1,68 @@
+{
+    "app": {
+        "title": "odin-app-template",
+        "intro": "Reference canister app for building on Odin Fun. Auth is wired up with Odin Connect — deposit/withdraw flows and the multi-token ledger UI land in later subtasks.",
+        "connectPrompt": "Connect with Odin to deposit, withdraw and view your balances."
+    },
+    "auth": {
+        "restoring": "Restoring session…",
+        "connecting": "Connecting…",
+        "connect": "Connect with Odin",
+        "connected": "Connected",
+        "disconnect": "Disconnect"
+    },
+    "language": {
+        "label": "Language",
+        "en": "English",
+        "zh": "简体中文"
+    },
+    "deposit": {
+        "heading": "Deposit",
+        "selectToken": "Select token…",
+        "amountPlaceholder": "Amount",
+        "submit": "Deposit",
+        "awaitingApproval": "Awaiting approval…",
+        "crediting": "Crediting…",
+        "credited": "Deposit credited.",
+        "balancesHeading": "Internal balances",
+        "noBalances": "No internal balances yet.",
+        "note": "Note: <0>deposit</0> pulls the approved funds via <1>icrc2_transfer_from</1> and credits your balance in one call — the credit is backed by tokens the canister actually moved, so no trusted minter is required.",
+        "errors": {
+            "loadTokens": "Failed to load tokens: {{message}}",
+            "approvalFailed": "Approval failed: {{message}}",
+            "depositFailed": "Deposit failed: {{message}}"
+        }
+    },
+    "withdraw": {
+        "heading": "Withdraw",
+        "selectToken": "Select token…",
+        "amountPlaceholder": "Amount",
+        "max": "Max",
+        "submit": "Withdraw",
+        "awaitingApproval": "Awaiting BTC approval…",
+        "withdrawing": "Withdrawing…",
+        "sent": "Withdrawal sent.",
+        "feeNote": "Network fee: ~{{sats}} sats in BTC. You approve BTC on withdraw so the canister can cover the Odin ledger transfer fee — no canister float needed.",
+        "noBalances": "No internal balances to withdraw. Deposit some tokens first.",
+        "errors": {
+            "feeApprovalFailed": "BTC fee approval failed: {{message}}",
+            "feeApprovalRejected": "BTC fee approval cancelled or rejected.",
+            "withdrawFailed": "Withdraw failed: {{message}}"
+        }
+    },
+    "errors": {
+        "noCanisterConfigured": "No app canister configured (set VITE_APP_CANISTER_ID).",
+        "notConnected": "Not connected.",
+        "selectTokenDeposit": "Select a token to deposit.",
+        "selectTokenWithdraw": "Select a token to withdraw.",
+        "invalidAmount": "Invalid amount.",
+        "amountGreaterThanZero": "Amount must be greater than zero.",
+        "approvalRejected": "Approval cancelled or rejected.",
+        "canisterUnavailableDeposit": "Canister unavailable — reconnect to enable deposits.",
+        "canisterUnavailableWithdraw": "Canister unavailable — reconnect to enable withdrawals.",
+        "tokenInfoLoading": "Token info still loading — try again in a moment.",
+        "insufficientBalance": "Insufficient internal balance.",
+        "unexpected": "Unexpected error",
+        "connectFailed": "Failed to connect to Odin"
+    }
+}

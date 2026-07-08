@@ -1,0 +1,68 @@
+{
+    "app": {
+        "title": "odin-app-template",
+        "intro": "用于在 Odin Fun 上开发的参考 canister 应用。已通过 Odin Connect 接入身份认证——充值/提现流程和多代币账本界面将在后续子任务中实现。",
+        "connectPrompt": "使用 Odin 连接以充值、提现并查看您的余额。"
+    },
+    "auth": {
+        "restoring": "正在恢复会话…",
+        "connecting": "正在连接…",
+        "connect": "使用 Odin 连接",
+        "connected": "已连接",
+        "disconnect": "断开连接"
+    },
+    "language": {
+        "label": "语言",
+        "en": "English",
+        "zh": "简体中文"
+    },
+    "deposit": {
+        "heading": "充值",
+        "selectToken": "选择代币…",
+        "amountPlaceholder": "金额",
+        "submit": "充值",
+        "awaitingApproval": "正在等待授权…",
+        "crediting": "正在入账…",
+        "credited": "充值已入账。",
+        "balancesHeading": "内部余额",
+        "noBalances": "暂无内部余额。",
+        "note": "注意：<0>deposit</0> 通过 <1>icrc2_transfer_from</1> 拉取已授权的资金，并在一次调用中为您的余额入账——该入账由 canister 实际转移的代币支持，因此无需可信的铸币方。",
+        "errors": {
+            "loadTokens": "加载代币失败：{{message}}",
+            "approvalFailed": "授权失败：{{message}}",
+            "depositFailed": "充值失败：{{message}}"
+        }
+    },
+    "withdraw": {
+        "heading": "提现",
+        "selectToken": "选择代币…",
+        "amountPlaceholder": "金额",
+        "max": "最大",
+        "submit": "提现",
+        "awaitingApproval": "正在等待 BTC 授权…",
+        "withdrawing": "正在提现…",
+        "sent": "提现已发送。",
+        "feeNote": "网络手续费：约 {{sats}} 聪（以 BTC 计）。您在提现时授权 BTC，以便 canister 支付 Odin 账本的转账手续费——无需 canister 预存资金。",
+        "noBalances": "没有可提现的内部余额。请先充值一些代币。",
+        "errors": {
+            "feeApprovalFailed": "BTC 手续费授权失败：{{message}}",
+            "feeApprovalRejected": "BTC 手续费授权已取消或被拒绝。",
+            "withdrawFailed": "提现失败：{{message}}"
+        }
+    },
+    "errors": {
+        "noCanisterConfigured": "未配置应用 canister（请设置 VITE_APP_CANISTER_ID）。",
+        "notConnected": "未连接。",
+        "selectTokenDeposit": "请选择要充值的代币。",
+        "selectTokenWithdraw": "请选择要提现的代币。",
+        "invalidAmount": "金额无效。",
+        "amountGreaterThanZero": "金额必须大于零。",
+        "approvalRejected": "授权已取消或被拒绝。",
+        "canisterUnavailableDeposit": "canister 不可用——请重新连接以启用充值。",
+        "canisterUnavailableWithdraw": "canister 不可用——请重新连接以启用提现。",
+        "tokenInfoLoading": "代币信息仍在加载——请稍后重试。",
+        "insufficientBalance": "内部余额不足。",
+        "unexpected": "发生意外错误",
+        "connectFailed": "连接 Odin 失败"
+    }
+}
