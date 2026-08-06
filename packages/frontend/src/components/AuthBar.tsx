@@ -18,6 +18,7 @@ function avatarUrl(principal: string): string {
 const styles: Record<string, React.CSSProperties> = {
     bar: {
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: '0.75rem',
         minHeight: '40px',
@@ -30,6 +31,7 @@ const styles: Record<string, React.CSSProperties> = {
         color: '#fff',
         fontWeight: 600,
         cursor: 'pointer',
+        flexShrink: 0,
     },
     secondary: {
         padding: '0.4rem 0.8rem',
@@ -38,6 +40,8 @@ const styles: Record<string, React.CSSProperties> = {
         background: 'transparent',
         color: 'inherit',
         cursor: 'pointer',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
     },
     avatar: {
         width: '32px',
@@ -45,12 +49,37 @@ const styles: Record<string, React.CSSProperties> = {
         borderRadius: '50%',
         objectFit: 'cover',
         background: '#eee',
+        flexShrink: 0,
     },
-    name: { fontWeight: 600 },
+    // Avatar plus the stacked username/principal, kept together as one chip.
+    identity: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        minWidth: 0,
+    },
+    identityText: {
+        display: 'flex',
+        flexDirection: 'column',
+        lineHeight: 1.25,
+        minWidth: 0,
+    },
+    // Usernames are user-supplied and can be long, so this one item is allowed
+    // to shrink — but it truncates with an ellipsis rather than wrapping.
+    name: {
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        minWidth: 0,
+        maxWidth: '16ch',
+    },
     principal: {
         fontFamily: 'ui-monospace, monospace',
         fontSize: '0.85rem',
         opacity: 0.7,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
     },
     error: { color: '#c0392b', fontSize: '0.9rem' },
 };
@@ -73,19 +102,25 @@ export function AuthBar() {
     if (status === 'connected' && principal !== null) {
         return (
             <div style={styles.bar}>
-                {profile?.image ? (
-                    <img
-                        src={avatarUrl(principal)}
-                        alt={profile.username}
-                        style={styles.avatar}
-                    />
-                ) : (
-                    <div style={styles.avatar} aria-hidden="true" />
-                )}
-                <span style={styles.name}>{profile?.username ?? t('auth.connected')}</span>
-                <span style={styles.principal} title={principal}>
-                    {shortPrincipal(principal)}
-                </span>
+                <div style={styles.identity}>
+                    {profile?.image ? (
+                        <img
+                            src={avatarUrl(principal)}
+                            alt={profile.username}
+                            style={styles.avatar}
+                        />
+                    ) : (
+                        <div style={styles.avatar} aria-hidden="true" />
+                    )}
+                    <div style={styles.identityText}>
+                        <span style={styles.name}>
+                            {profile?.username ?? t('auth.connected')}
+                        </span>
+                        <span style={styles.principal} title={principal}>
+                            {shortPrincipal(principal)}
+                        </span>
+                    </div>
+                </div>
                 <button
                     type="button"
                     style={styles.secondary}
