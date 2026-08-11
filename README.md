@@ -203,8 +203,9 @@ SDK.
 **Add a language (i18n)** — the frontend is localized with
 [react-i18next](https://react.i18next.com/). English (`en`) is the default and
 the source of truth for keys; Simplified Chinese (`zh`) ships alongside it.
-Locale detection is `localStorage` → browser language → `en`, and the choice
-persists across reloads. To add a locale (e.g. Japanese, `ja`):
+Locale detection is `?lang=` query param → `localStorage` → browser language →
+`en`, and the choice persists across reloads. To add a locale (e.g. Japanese,
+`ja`):
 
 1. Copy [`src/i18n/locales/en.json`](packages/frontend/src/i18n/locales/en.json)
    to `src/i18n/locales/ja.json` and translate the values (keep the keys).
@@ -218,3 +219,17 @@ at compile time (a missing or misspelled key fails `pnpm typecheck`), so keep
 the key sets identical. The switcher in
 [`src/components/LanguageSwitcher.tsx`](packages/frontend/src/components/LanguageSwitcher.tsx)
 renders one option per `SUPPORTED_LOCALES` entry automatically.
+
+**Share a language via URL (`?lang=`)** — opening the app with `?lang=zh` (or
+`?lang=en`) applies that language as if the user had picked it in the switcher:
+it is persisted to `localStorage` and the param is stripped from the URL so a
+stale link can't override a later in-app choice. Regional variants map to their
+base language (`zh-CN` → `zh`); unsupported values are ignored. See
+[`src/i18n/locale.ts`](packages/frontend/src/i18n/locale.ts).
+
+**Language in the Odin Connect popups** — the app forwards its active locale to
+the [odin-connect](https://www.npmjs.com/package/odin-connect) SDK (≥ 1.6.0):
+`lang` is passed when the `OdinConnect` instance is created and updated via the
+SDK's runtime `lang` setter whenever the user switches language, so sign-in and
+canister-action popups open in the app's current language without a reload. See
+[`src/odin/OdinConnectProvider.tsx`](packages/frontend/src/odin/OdinConnectProvider.tsx).

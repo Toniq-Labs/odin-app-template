@@ -4,15 +4,10 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en from './locales/en.json';
 import zh from './locales/zh.json';
+import { consumeLangQueryParam, LOCALE_STORAGE_KEY, SUPPORTED_LOCALES } from './locale';
 
-/**
- * Supported locales. `en` is the default and the source of truth for keys.
- * Adding a locale: drop in `locales/xx.json` (same keys as `en.json`),
- * import it, add it to `resources` + `SUPPORTED_LOCALES`, and add an
- * `<option>` in `LanguageSwitcher`.
- */
-export const SUPPORTED_LOCALES = ['en', 'zh'] as const;
-export type Locale = (typeof SUPPORTED_LOCALES)[number];
+export { SUPPORTED_LOCALES } from './locale';
+export type { Locale } from './locale';
 
 /**
  * Compile-time key-parity guard: `LocaleCatalog` is `en`'s exact key shape with
@@ -32,7 +27,9 @@ const zhCatalog: LocaleCatalog = zh;
 const _zhParity: DeepStringify<typeof zh> = en;
 void _zhParity;
 
-const STORAGE_KEY = 'odin-app-locale';
+// Honor `?lang=` before init so the detector's localStorage lookup below
+// already sees the choice (see `consumeLangQueryParam` for the semantics).
+consumeLangQueryParam();
 
 void i18n
     .use(LanguageDetector)
@@ -51,8 +48,9 @@ void i18n
         interpolation: { escapeValue: false },
         detection: {
             // localStorage first, then the browser language, then `fallbackLng`.
+            // (`?lang=` is consumed into localStorage above, so it wins here.)
             order: ['localStorage', 'navigator'],
-            lookupLocalStorage: STORAGE_KEY,
+            lookupLocalStorage: LOCALE_STORAGE_KEY,
             caches: ['localStorage'],
         },
     });

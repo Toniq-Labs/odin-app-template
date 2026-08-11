@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OdinConnect } from 'odin-connect';
+import { OdinConnect, OdinUtils } from 'odin-connect';
 import type { OdinConnectedUser, OdinUser } from 'odin-connect';
 
 import { OdinConnectContext } from './context';
@@ -31,13 +31,29 @@ function toMessage(error: unknown, fallback: string): string {
  * React.
  */
 export function OdinConnectProvider({ children }: { children: ReactNode }) {
-    const { t } = useTranslation();
-    // One SDK instance for the app's lifetime.
+    const { t, i18n } = useTranslation();
+    // One SDK instance for the app's lifetime. `lang` sets the language of the
+    // Odin Connect popups (sign-in + canister actions); the effect below keeps
+    // it in step with the app locale after init.
     const odin = useMemo(
-        () => new OdinConnect({ name: APP_NAME, env: APP_ENV }),
+        () =>
+            new OdinConnect({
+                name: APP_NAME,
+                env: APP_ENV,
+                lang: OdinUtils.normalizeOdinLang(i18n.resolvedLanguage),
+            }),
+        // The instance must not be recreated on language change — the live
+        // `lang` setter handles that — so the locale is deliberately not a dep.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
     );
     const userRef = useRef<OdinConnectedUser | null>(null);
+
+    // Follow the app locale: the SDK reads `lang` when a popup opens, so a
+    // language switch applies to the next popup without any reload.
+    useEffect(() => {
+        odin.lang = OdinUtils.normalizeOdinLang(i18n.resolvedLanguage);
+    }, [odin, i18n.resolvedLanguage]);
 
     const [status, setStatus] = useState<OdinAuthStatus>('restoring');
     const [principal, setPrincipal] = useState<string | null>(null);
