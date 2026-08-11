@@ -9,6 +9,7 @@ const style: React.CSSProperties = {
     background: 'transparent',
     color: 'inherit',
     cursor: 'pointer',
+    flexShrink: 0,
 };
 
 /**

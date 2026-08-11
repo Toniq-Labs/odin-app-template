@@ -18,9 +18,13 @@ export function App() {
 
     return (
         <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem', maxWidth: '720px' }}>
+            {/* Wraps as whole groups: the title and the controls each stay
+                intact and move to their own line instead of being squeezed
+                until words break mid-token. */}
             <header
                 style={{
                     display: 'flex',
+                    flexWrap: 'wrap',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     gap: '1rem',
@@ -30,8 +34,10 @@ export function App() {
                 <div
                     style={{
                         display: 'flex',
+                        flexWrap: 'wrap',
                         alignItems: 'center',
                         gap: '0.75rem',
+                        marginLeft: 'auto',
                     }}
                 >
                     <LanguageSwitcher />
