@@ -38,6 +38,13 @@ dfx `frontend` asset canister serves.
    generated env (dfx writes `.env`) / declarations, not string literals.
 4. **Keep types honest.** Strict mode is on; do not add `any` or `// @ts-ignore`
    to silence real type errors from canister bindings.
+5. **Every awaited SDK action must be resumable.** In redirect mode (wallet
+   in-app browsers, `VITE_ODIN_CONNECT_MODE`) `connect()` and every
+   `user.*` action navigate this tab to Odin and the awaited promise never
+   returns. Describe the step that follows an approval as a `ResumeState`
+   (`src/odin/resume.ts`), pass it as `returnState`, and run it from
+   `useResumeFlow` on the next page load. Never put the continuation only in
+   code after the `await`.
 
 ## Conventions
 

@@ -7,6 +7,7 @@
     "auth": {
         "restoring": "Restoring session…",
         "connecting": "Connecting…",
+        "redirecting": "Opening Odin…",
         "connect": "Connect with Odin",
         "connected": "Connected",
         "disconnect": "Disconnect"
@@ -63,6 +64,8 @@
         "tokenInfoLoading": "Token info still loading — try again in a moment.",
         "insufficientBalance": "Insufficient internal balance.",
         "unexpected": "Unexpected error",
-        "connectFailed": "Failed to connect to Odin"
+        "connectFailed": "Failed to connect to Odin",
+        "connectRejected": "Connection cancelled or rejected on Odin.",
+        "redirectInvalid": "Could not read the result from Odin — please try again."
     }
 }

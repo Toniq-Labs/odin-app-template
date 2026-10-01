@@ -4,6 +4,8 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
+import { useResumeFlow } from '../odin/useResumeFlow';
+import type { ResumeState } from '../odin/resume';
 import type { CanisterActor } from '../canister/idl';
 import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
@@ -58,6 +60,11 @@ const styles: Record<string, React.CSSProperties> = {
  * The credit is backed by real funds because the canister moves the tokens
  * itself inside deposit() before crediting — icrcApprove alone only grants the
  * allowance.
+ *
+ * In redirect mode (wallet in-app browsers) the approval navigates this tab
+ * to Odin and back, so the awaited `icrcApprove()` never returns. The second
+ * step is described up front as `returnState` and `useResumeFlow` runs it on
+ * the next page load.
  */
 export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
     const { t } = useTranslation();
@@ -142,6 +149,46 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
 
     const busy = stage === 'approving' || stage === 'crediting';
 
+    // Step 2 of the deposit: pull the approved funds into the canister and
+    // credit the internal ledger. deposit() runs icrc2_transfer_from then
+    // credits the caller. Shared by the popup path (right after the awaited
+    // approval) and the redirect path (on the next page load).
+    const credit = useCallback(
+        async (tokenId: string, raw: bigint) => {
+            if (actor === null) {
+                setStage('idle');
+                setError(t('errors.canisterUnavailableDeposit'));
+                return;
+            }
+            setStage('crediting');
+            try {
+                await actor.deposit(tokenId, raw);
+            } catch (err) {
+                setStage('idle');
+                setError(t('deposit.errors.depositFailed', { message: toMessage(err, t('errors.unexpected')) }));
+                return;
+            }
+
+            setStage('done');
+            setAmount('');
+            await refresh();
+            void loadHoldings();
+        },
+        [actor, refresh, loadHoldings, t],
+    );
+
+    // Redirect mode: the approval this page load returned from.
+    useResumeFlow('deposit', actor, (state, status) => {
+        setError(null);
+        if (status === 'failed') {
+            setStage('idle');
+            setError(t('errors.approvalRejected'));
+            return;
+        }
+        setSelectedId(state.tokenId);
+        void credit(state.tokenId, state.amount);
+    });
+
     const deposit = useCallback(async () => {
         setError(null);
 
@@ -174,6 +221,9 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         // 1. Approve the app canister to pull `raw` of this token via ICRC-2.
         //    Unlike a direct transfer this only grants an allowance — the
         //    canister must call icrc2_transfer_from to actually move the funds.
+        //    `returnState` describes step 2 for redirect mode, where this
+        //    await never returns (the tab navigates to Odin and back).
+        const resume: ResumeState = { flow: 'deposit', tokenId: holding.token.id, amount: raw };
         setStage('approving');
         let approved: boolean;
         try {
@@ -181,6 +231,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                 token: holding.token.id,
                 spender: APP_CANISTER_ID,
                 amount: raw,
+                returnState: resume,
             });
         } catch (err) {
             setStage('idle');
@@ -193,27 +244,9 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             return;
         }
 
-        // 2. Pull the approved funds into the canister and credit the internal
-        //    ledger. deposit() runs icrc2_transfer_from then credits the caller.
-        if (actor === null) {
-            setStage('idle');
-            setError(t('errors.canisterUnavailableDeposit'));
-            return;
-        }
-        setStage('crediting');
-        try {
-            await actor.deposit(holding.token.id, raw);
-        } catch (err) {
-            setStage('idle');
-            setError(t('deposit.errors.depositFailed', { message: toMessage(err, t('errors.unexpected')) }));
-            return;
-        }
-
-        setStage('done');
-        setAmount('');
-        await refresh();
-        void loadHoldings();
-    }, [user, principal, actor, depositable, selectedId, amount, refresh, loadHoldings, t]);
+        // 2. Popup mode lands here; redirect mode runs this via useResumeFlow.
+        await credit(holding.token.id, raw);
+    }, [user, principal, depositable, selectedId, amount, credit, t]);
 
     return (
         <section style={styles.card}>

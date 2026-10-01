@@ -132,7 +132,9 @@ export function AuthBar() {
         );
     }
 
-    const connecting = status === 'connecting';
+    // `redirecting` only lasts until this tab navigates to Odin; the button
+    // stays disabled so a double tap cannot start a second round trip.
+    const connecting = status === 'connecting' || status === 'redirecting';
     return (
         <div style={styles.bar}>
             <button
@@ -141,7 +143,11 @@ export function AuthBar() {
                 onClick={() => void connect()}
                 disabled={connecting}
             >
-                {connecting ? t('auth.connecting') : t('auth.connect')}
+                {status === 'redirecting'
+                    ? t('auth.redirecting')
+                    : connecting
+                      ? t('auth.connecting')
+                      : t('auth.connect')}
             </button>
             {status === 'error' && error !== null ? (
                 <span style={styles.error} role="alert">

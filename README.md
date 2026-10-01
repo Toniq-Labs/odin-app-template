@@ -233,3 +233,41 @@ the [odin-connect](https://www.npmjs.com/package/odin-connect) SDK (≥ 1.6.0):
 SDK's runtime `lang` setter whenever the user switches language, so sign-in and
 canister-action popups open in the app's current language without a reload. See
 [`src/odin/OdinConnectProvider.tsx`](packages/frontend/src/odin/OdinConnectProvider.tsx).
+
+## Wallet in-app browsers (redirect mode)
+
+Some wallet in-app browsers (OKX, …) open popups as detached pages that can
+never report back, so the Odin Connect popup flow silently does nothing there.
+The frontend therefore lets the SDK choose how to reach Odin via
+`VITE_ODIN_CONNECT_MODE` (see [`.env.example`](packages/frontend/.env.example)):
+
+- `auto` (default) — redirect this tab inside a wallet in-app browser, popup
+  everywhere else.
+- `popup` / `redirect` — force one; `redirect` is handy for exercising the
+  redirect flow on a desktop browser.
+
+In redirect mode the page **reloads** after every Odin round trip, so an
+awaited `connect()` or `icrcApprove()` never returns. The app handles that in
+two places:
+
+- [`src/odin/OdinConnectProvider.tsx`](packages/frontend/src/odin/OdinConnectProvider.tsx)
+  reads the SDK's `handleRedirectResult()` on mount, before restoring the
+  session: a connect result adopts the user (or shows the rejection), and an
+  approval result is exposed as `pendingResume`. In redirect mode `connect()`
+  requests only the delegation — the SDK rejects `requires_api` there, and the
+  app never needs the API key.
+- Deposit and withdraw both do canister work *after* the approval
+  (`deposit` / `withdraw`). That step is described up front as a
+  [`ResumeState`](packages/frontend/src/odin/resume.ts) (flow, token id, raw
+  `bigint` amount), passed to `icrcApprove` as `returnState` (kept by the SDK in
+  `sessionStorage`, never sent to Odin), and run by
+  [`useResumeFlow`](packages/frontend/src/odin/useResumeFlow.ts) once the
+  canister actor has been rebuilt from the restored delegation. A rejected
+  approval surfaces the usual error instead.
+
+If the user closes the tab between the approval and the return, the on-chain
+allowance exists but nothing was credited. That is safe: the next deposit's
+approval replaces the allowance, and `deposit` only ever credits funds it has
+actually pulled.
+
+Requires `odin-connect` ≥ 1.8.0 (`mode`, `returnState`, `handleRedirectResult`).

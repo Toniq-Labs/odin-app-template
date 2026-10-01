@@ -4,6 +4,8 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
+import { useResumeFlow } from '../odin/useResumeFlow';
+import type { ResumeState } from '../odin/resume';
 import type { CanisterActor } from '../canister/idl';
 import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
@@ -64,6 +66,11 @@ const styles: Record<string, React.CSSProperties> = {
  * Withdraw flow: user picks a token from their internal balances and an amount
  * (capped at that balance), the canister debits the ledger and sends the tokens
  * back to the caller on the Odin ledger, then the balance refreshes.
+ *
+ * In redirect mode (wallet in-app browsers) the BTC fee approval navigates
+ * this tab to Odin and back, so the awaited `icrcApprove()` never returns. The
+ * withdraw step is described up front as `returnState` and `useResumeFlow`
+ * runs it on the next page load.
  */
 export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
     const { t } = useTranslation();
@@ -175,6 +182,48 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         }
     }, [selected, selectedToken, places]);
 
+    // Step 2 of the withdrawal: the canister pulls the approved fee, then
+    // sends the tokens. A ledger transfer failure refunds the debited balance.
+    // Shared by the popup path (right after the awaited approval) and the
+    // redirect path (on the next page load). The canister re-checks the
+    // balance, so an overdraft surfaces as withdrawFailed either way.
+    const send = useCallback(
+        async (tokenId: string, raw: bigint) => {
+            if (actor === null) {
+                setStage('idle');
+                setError(t('errors.canisterUnavailableWithdraw'));
+                return;
+            }
+            setStage('withdrawing');
+            try {
+                await actor.withdraw(tokenId, raw);
+            } catch (err) {
+                setStage('idle');
+                // Canister rejects overdrafts; an Odin ledger transfer failure
+                // refunds the debited balance and surfaces here too.
+                setError(t('withdraw.errors.withdrawFailed', { message: toMessage(err, t('errors.unexpected')) }));
+                return;
+            }
+
+            setStage('done');
+            setAmount('');
+            await refresh();
+        },
+        [actor, refresh, t],
+    );
+
+    // Redirect mode: the fee approval this page load returned from.
+    useResumeFlow('withdraw', actor, (state, status) => {
+        setError(null);
+        if (status === 'failed') {
+            setStage('idle');
+            setError(t('withdraw.errors.feeApprovalRejected'));
+            return;
+        }
+        setSelectedTokenId(state.tokenId);
+        void send(state.tokenId, state.amount);
+    });
+
     const withdraw = useCallback(async () => {
         setError(null);
 
@@ -222,6 +271,9 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         //    withdraw to pay the Odin ledger's per-transfer fee, so withdrawals
         //    need no canister BTC float. The allowance covers the fee twice (the
         //    pull amount + the ledger fee on that pull) — see lib/fees.ts.
+        //    `returnState` describes step 2 for redirect mode, where this
+        //    await never returns (the tab navigates to Odin and back).
+        const resume: ResumeState = { flow: 'withdraw', tokenId: selected.token, amount: raw };
         setStage('approving');
         let approved: boolean;
         try {
@@ -229,6 +281,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                 token: BTC_TOKEN_ID,
                 spender: APP_CANISTER_ID,
                 amount: WITHDRAW_FEE_APPROVAL,
+                returnState: resume,
             });
         } catch (err) {
             setStage('idle');
@@ -241,23 +294,9 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             return;
         }
 
-        // 2. Withdraw: the canister pulls the approved fee, then sends the
-        //    tokens. A ledger transfer failure refunds the debited balance.
-        setStage('withdrawing');
-        try {
-            await actor.withdraw(selected.token, raw);
-        } catch (err) {
-            setStage('idle');
-            // Canister rejects overdrafts; an Odin ledger transfer failure
-            // refunds the debited balance and surfaces here too.
-            setError(t('withdraw.errors.withdrawFailed', { message: toMessage(err, t('errors.unexpected')) }));
-            return;
-        }
-
-        setStage('done');
-        setAmount('');
-        await refresh();
-    }, [actor, selected, selectedToken, amount, refresh, user, t]);
+        // 2. Popup mode lands here; redirect mode runs this via useResumeFlow.
+        await send(selected.token, raw);
+    }, [actor, selected, selectedToken, amount, user, send, t]);
 
     return (
         <section style={styles.card}>

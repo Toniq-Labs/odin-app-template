@@ -7,6 +7,7 @@
     "auth": {
         "restoring": "正在恢复会话…",
         "connecting": "正在连接…",
+        "redirecting": "正在打开 Odin…",
         "connect": "使用 Odin 连接",
         "connected": "已连接",
         "disconnect": "断开连接"
@@ -63,6 +64,8 @@
         "tokenInfoLoading": "代币信息仍在加载——请稍后重试。",
         "insufficientBalance": "内部余额不足。",
         "unexpected": "发生意外错误",
-        "connectFailed": "连接 Odin 失败"
+        "connectFailed": "连接 Odin 失败",
+        "connectRejected": "连接已在 Odin 上取消或被拒绝。",
+        "redirectInvalid": "无法读取来自 Odin 的结果——请重试。"
     }
 }
