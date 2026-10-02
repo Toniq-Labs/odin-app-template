@@ -5,7 +5,7 @@ Reference canister app template for building on **Odin Fun**. Fork it, deploy it
 ## Stack
 
 - **Canister**: [Azle](https://github.com/demergent-labs/azle) (TypeScript, Internet Computer)
-- **Frontend**: React + TypeScript + Vite, [odin-connect](https://www.npmjs.com/package/odin-connect) SDK
+- **Frontend**: React + TypeScript + Vite, [odin-connect](https://www.npmjs.com/package/odin-connect) SDK (2.x, state store — see [Odin Connect in the frontend](#odin-connect-in-the-frontend))
 - **Tooling**: dfx, pnpm workspace
 
 ## Architecture
@@ -15,7 +15,7 @@ flowchart LR
     user([User])
     fe["Frontend<br/>(React + Vite)"]
     oc["odin-connect SDK"]
-    popup["Odin Fun<br/>approval popup"]
+    popup["Odin Fun<br/>approval (popup or redirect)"]
     can["App canister<br/>(Azle)"]
     ledger[("Internal ledger<br/>StableBTreeMap<br/>(owner|tokenId) → balance")]
     odin["Odin ledger<br/>(one multiplexed ICRC ledger)"]
@@ -30,7 +30,8 @@ flowchart LR
 ```
 
 **Deposit**: the user approves the app canister as an ICRC-2 spender through the
-Odin Fun popup; the canister then pulls the approved funds itself
+Odin Fun approval page (a popup, or a full-page redirect in wallet in-app
+browsers); once the approval's result is in the odin-connect state, the canister then pulls the approved funds itself
 (`icrc2_transfer_from` on the Odin ledger) and credits the user's internal
 balance. It is permissionless and self-verifying — a credit is only recorded for
 funds that actually settled into the canister.
@@ -40,6 +41,76 @@ balance (persisted *before* the transfer await), pulls the BTC ledger fee from
 the withdrawer (`icrc2_transfer_from`, see [Withdrawal fees](#withdrawal-fees)),
 then sends the tokens back out on the Odin ledger (`icrc1_transfer`), refunding
 the debit on failure.
+
+## Odin Connect in the frontend
+
+The frontend uses [odin-connect](https://www.npmjs.com/package/odin-connect)
+**2.x**, which delivers every result — a connect, an ICRC-2 approval, a buy —
+through **one state store** instead of only through the promise returned by the
+call. That is what makes the app work inside wallet in-app browsers (OKX,
+Xverse, …): there the SDK's default `mode: "auto"` navigates the tab to Odin
+and back, the page reloads, and an awaited promise from before the reload never
+returns. In normal browsers it uses popups; the app code is the same.
+
+The pattern, as wired in this template:
+
+1. **One instance per page load**, created at module level:
+   [`src/odin/client.ts`](packages/frontend/src/odin/client.ts). Never one per
+   render or per route.
+2. **Render from state** with `useSyncExternalStore(odin.subscribe,
+   odin.getState, odin.getServerState)`:
+   [`src/odin/useOdinState.ts`](packages/frontend/src/odin/useOdinState.ts).
+   `state` is `{ status, user, request }`; `status` is `"initializing"` until
+   the stored session (and any returning redirect result) has been applied.
+   [`OdinConnectProvider`](packages/frontend/src/odin/OdinConnectProvider.tsx)
+   derives the UI's auth status from it
+   ([`authStatus.ts`](packages/frontend/src/odin/authStatus.ts)) — there is no
+   `restoreSession()` call.
+3. **Start things from buttons, don't await them.** `odin.connect(…)` and
+   `user.icrcApprove(…)` are fire-and-forget; their outcome arrives as
+   `state.request` (`{ id, action, status, input, returnState?, error? }`,
+   `status` one of `pending | success | rejected | failed | unverified`).
+4. **React to `request` for the follow-up step.**
+   [`DepositForm`](packages/frontend/src/components/DepositForm.tsx) and
+   [`WithdrawForm`](packages/frontend/src/components/WithdrawForm.tsx) each have
+   an effect that, when *their* `icrc_approve` request is `success`, calls the
+   canister (`deposit` / `withdraw`). Rules they follow
+   ([`approvalFlow.ts`](packages/frontend/src/odin/approvalFlow.ts)):
+   - read call arguments from `request.input`, not from form state (gone after
+     a redirect); put anything else the next step needs in `returnState`
+     (JSON, bigints allowed) — withdraw carries the token + amount there, since
+     its approval is for the BTC fee;
+   - tag each flow's `returnState` (`{ flow: 'deposit' }`) so two flows that
+     start the same action don't both react;
+   - run a value-moving follow-up **at most once per `request.id`** (claimed
+     before the call), because effects re-run and a settled request stays in
+     state;
+   - never treat `success` as proof: the canister's `icrc2_transfer_from` is the
+     on-chain check of the allowance;
+   - never call `connect()` automatically after a `rejected` / `unverified`
+     connect — in redirect mode that loops the user back to Odin; show the
+     Connect button (retry) instead.
+
+Consequences for your fork:
+
+- Code that reads `location.search` on load must read it after
+  `await odin.ready()` (Odin returns to the page path without the query; the
+  SDK restores it). The template's only such reader, `?lang=`, is consumed and
+  stripped before any connect can start, so it is unaffected.
+- If you add a Content-Security-Policy, `connect-src` must allow
+  `https://api.odin.fun` — every connect is verified there.
+- Do not add open-redirect pages (`/go?to=…`, `/redirect/<url>`) on your
+  origin: redirect mode with `requires_api` / `requires_delegation` relies on
+  Odin only returning to your own pages.
+- To test the redirect path in a desktop browser, run `odin.mode = "redirect"`
+  in the console (or construct with `mode: "redirect"` temporarily). Use
+  `https://` or `http://localhost`.
+
+Upgrading an older fork (odin-connect 1.6/1.7)? Follow the SDK's
+[migration guide](https://github.com/Toniq-Labs/odin-connect/blob/main/MIGRATION-2.0.md)
+(shipped in the package as `node_modules/odin-connect/MIGRATION-2.0.md`) and the
+[readme](https://github.com/Toniq-Labs/odin-connect#readme) ("State and
+sessions", "Wallet in-app browsers").
 
 ## Layout
 
@@ -198,7 +269,8 @@ CORE` markers in
 **Frontend changes** — UI, components, and styling under
 [`packages/frontend/src`](packages/frontend/src) are free to modify. Auth and
 flows are built on the [odin-connect](https://www.npmjs.com/package/odin-connect)
-SDK.
+SDK — render from its state, never from an awaited call (see
+[Odin Connect in the frontend](#odin-connect-in-the-frontend)).
 
 **Add a language (i18n)** — the frontend is localized with
 [react-i18next](https://react.i18next.com/). English (`en`) is the default and
@@ -227,9 +299,9 @@ stale link can't override a later in-app choice. Regional variants map to their
 base language (`zh-CN` → `zh`); unsupported values are ignored. See
 [`src/i18n/locale.ts`](packages/frontend/src/i18n/locale.ts).
 
-**Language in the Odin Connect popups** — the app forwards its active locale to
-the [odin-connect](https://www.npmjs.com/package/odin-connect) SDK (≥ 1.6.0):
-`lang` is passed when the `OdinConnect` instance is created and updated via the
-SDK's runtime `lang` setter whenever the user switches language, so sign-in and
-canister-action popups open in the app's current language without a reload. See
+**Language in the Odin Connect pages** — the app forwards its active locale to
+the [odin-connect](https://www.npmjs.com/package/odin-connect) SDK via its
+runtime `lang` setter, on mount and whenever the user switches language, so
+sign-in and canister-action pages (popup or redirect) open in the app's current
+language without a reload. See
 [`src/odin/OdinConnectProvider.tsx`](packages/frontend/src/odin/OdinConnectProvider.tsx).

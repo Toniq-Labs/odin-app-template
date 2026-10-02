@@ -4,6 +4,8 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
+import { approvalFor, claimRequest } from '../odin/approvalFlow';
+import type { ApprovalReturnState } from '../odin/approvalFlow';
 import type { CanisterActor } from '../canister/idl';
 import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
@@ -62,12 +64,14 @@ const styles: Record<string, React.CSSProperties> = {
 
 /**
  * Withdraw flow: user picks a token from their internal balances and an amount
- * (capped at that balance), the canister debits the ledger and sends the tokens
- * back to the caller on the Odin ledger, then the balance refreshes.
+ * (capped at that balance) and approves the BTC withdrawal fee (a popup, or a
+ * redirect to Odin in wallet in-app browsers). Once that approval's result is
+ * in the SDK state, the canister debits the ledger and sends the tokens back
+ * to the caller on the Odin ledger, then the balance refreshes.
  */
 export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
     const { t } = useTranslation();
-    const { user, getToken } = useOdinConnect();
+    const { user, request, getToken } = useOdinConnect();
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
     const [resolved, setResolved] = useState<Map<string, OdinToken>>(new Map());
@@ -165,7 +169,12 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         ? selectedToken.divisibility + selectedToken.decimals
         : 0;
 
-    const busy = stage === 'approving' || stage === 'withdrawing';
+    // This flow's BTC fee approval, if it is the SDK's latest request.
+    const approval = approvalFor(request, 'withdraw');
+    // 'approving' is derived from the SDK state, so it is right in both modes.
+    const shownStage: Stage =
+        approval?.request.status === 'pending' ? 'approving' : stage;
+    const busy = shownStage === 'approving' || shownStage === 'withdrawing';
 
     const fillMax = useCallback(() => {
         // Needs real divisibility/decimals; without meta the formatted value
@@ -175,8 +184,13 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
         }
     }, [selected, selectedToken, places]);
 
-    const withdraw = useCallback(async () => {
+    // 1. From the button: validate, then start the BTC fee approval. Not
+    //    awaited — in a wallet in-app browser the SDK redirects to Odin and the
+    //    page reloads, so an awaited promise would never return. The result
+    //    arrives as `request` and is handled by the effect below.
+    const withdraw = useCallback(() => {
         setError(null);
+        setStage('idle');
 
         if (APP_CANISTER_ID === '') {
             setError(t('errors.noCanisterConfigured'));
@@ -218,46 +232,97 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
             return;
         }
 
-        // 1. Approve BTC for the withdrawal fee. The canister pulls this during
-        //    withdraw to pay the Odin ledger's per-transfer fee, so withdrawals
-        //    need no canister BTC float. The allowance covers the fee twice (the
-        //    pull amount + the ledger fee on that pull) — see lib/fees.ts.
-        setStage('approving');
-        let approved: boolean;
-        try {
-            approved = await user.icrcApprove({
-                token: BTC_TOKEN_ID,
-                spender: APP_CANISTER_ID,
-                amount: WITHDRAW_FEE_APPROVAL,
-            });
-        } catch (err) {
-            setStage('idle');
-            setError(t('withdraw.errors.feeApprovalFailed', { message: toMessage(err, t('errors.unexpected')) }));
-            return;
-        }
-        if (!approved) {
-            setStage('idle');
-            setError(t('withdraw.errors.feeApprovalRejected'));
-            return;
-        }
+        // Approve BTC for the withdrawal fee. The canister pulls this during
+        // withdraw to pay the Odin ledger's per-transfer fee, so withdrawals
+        // need no canister BTC float. The allowance covers the fee twice (the
+        // pull amount + the ledger fee on that pull) — see lib/fees.ts.
+        //
+        // The approval's `request.input` is the fee, not the withdrawal, so
+        // the token + amount to withdraw ride in `returnState`: it survives
+        // the redirect round trip (bigints included), form state does not.
+        const returnState: ApprovalReturnState = {
+            flow: 'withdraw',
+            token: selected.token,
+            amount: raw,
+        };
+        void user.icrcApprove({
+            token: BTC_TOKEN_ID,
+            spender: APP_CANISTER_ID,
+            amount: WITHDRAW_FEE_APPROVAL,
+            returnState,
+        });
+    }, [actor, selected, selectedToken, amount, user, t]);
 
-        // 2. Withdraw: the canister pulls the approved fee, then sends the
-        //    tokens. A ledger transfer failure refunds the debited balance.
-        setStage('withdrawing');
-        try {
-            await actor.withdraw(selected.token, raw);
-        } catch (err) {
-            setStage('idle');
-            // Canister rejects overdrafts; an Odin ledger transfer failure
-            // refunds the debited balance and surfaces here too.
-            setError(t('withdraw.errors.withdrawFailed', { message: toMessage(err, t('errors.unexpected')) }));
+    // 2. When the fee approval settles (popup, or after the redirect reload):
+    //    on success, withdraw — the canister pulls the approved fee, then
+    //    sends the tokens. A ledger transfer failure refunds the debited
+    //    balance. The canister also re-checks the balance (debit rejects
+    //    overdrafts), so a stale amount from `returnState` cannot overdraw.
+    //
+    //    "success" is only a UI signal; the canister's icrc2_transfer_from of
+    //    the fee is the on-chain check of the allowance.
+    useEffect(() => {
+        const current = approvalFor(request, 'withdraw');
+        if (current === null) {
             return;
         }
+        const { id, status } = current.request;
+        if (status === 'rejected') {
+            if (claimRequest(id)) {
+                setError(t('withdraw.errors.feeApprovalRejected'));
+            }
+            return;
+        }
+        if (status === 'failed') {
+            if (claimRequest(id)) {
+                setError(
+                    t('withdraw.errors.feeApprovalFailed', {
+                        message: current.request.error ?? t('errors.unexpected'),
+                    }),
+                );
+            }
+            return;
+        }
+        if (status !== 'success') {
+            return;
+        }
+        if (user !== null && user.getIdentity() === null) {
+            // No delegation to call the canister with (should not happen:
+            // connect requests one whenever a canister id is configured).
+            if (claimRequest(id)) {
+                setError(t('errors.canisterUnavailableWithdraw'));
+            }
+            return;
+        }
+        if (actor === null) {
+            // After a redirect reload the actor is still being built from the
+            // restored delegation; this effect re-runs once it exists.
+            return;
+        }
+        // At most once per approval: claimed before the await, so re-renders,
+        // StrictMode and remounts cannot withdraw twice.
+        if (!claimRequest(id)) {
+            return;
+        }
+        const { token, amount: raw } = current.returnState;
+        void (async () => {
+            setError(null);
+            setStage('withdrawing');
+            try {
+                await actor.withdraw(token, raw);
+            } catch (err) {
+                setStage('idle');
+                // Canister rejects overdrafts; an Odin ledger transfer failure
+                // refunds the debited balance and surfaces here too.
+                setError(t('withdraw.errors.withdrawFailed', { message: toMessage(err, t('errors.unexpected')) }));
+                return;
+            }
 
-        setStage('done');
-        setAmount('');
-        await refresh();
-    }, [actor, selected, selectedToken, amount, refresh, user, t]);
+            setStage('done');
+            setAmount('');
+            await refresh();
+        })();
+    }, [request, user, actor, refresh, t]);
 
     return (
         <section style={styles.card}>
@@ -311,12 +376,12 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                 <button
                     type="button"
                     style={styles.button}
-                    onClick={() => void withdraw()}
+                    onClick={withdraw}
                     disabled={busy || selectedTokenId === '' || amount === ''}
                 >
-                    {stage === 'approving'
+                    {shownStage === 'approving'
                         ? t('withdraw.awaitingApproval')
-                        : stage === 'withdrawing'
+                        : shownStage === 'withdrawing'
                           ? t('withdraw.withdrawing')
                           : t('withdraw.submit')}
                 </button>
@@ -331,7 +396,7 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
                     {error}
                 </div>
             ) : null}
-            {stage === 'done' && error === null ? (
+            {shownStage === 'done' && error === null ? (
                 <div style={styles.ok}>{t('withdraw.sent')}</div>
             ) : null}
 

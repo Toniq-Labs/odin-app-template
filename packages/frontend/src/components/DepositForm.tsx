@@ -4,6 +4,8 @@ import { OdinUtils } from 'odin-connect';
 import type { OdinToken, OdinTokenWithBalance } from 'odin-connect';
 
 import { useOdinConnect } from '../odin/useOdinConnect';
+import { approvalFor, claimRequest } from '../odin/approvalFlow';
+import type { ApprovalReturnState } from '../odin/approvalFlow';
 import type { CanisterActor } from '../canister/idl';
 import type { InternalBalance } from '../canister/useInternalBalances';
 import { APP_CANISTER_ID } from '../canister/config';
@@ -51,9 +53,11 @@ const styles: Record<string, React.CSSProperties> = {
 
 /**
  * Deposit flow: user picks an Odin token + amount, the odin-connect ICRC-2
- * approval popup grants the app canister an allowance, then the canister's
- * deposit() pulls the approved funds (icrc2_transfer_from) and credits the
- * internal ledger before the balance is refreshed.
+ * approval (a popup, or a redirect to Odin in wallet in-app browsers) grants
+ * the app canister an allowance, then — once the approval's result is in the
+ * SDK state — the canister's deposit() pulls the approved funds
+ * (icrc2_transfer_from) and credits the internal ledger before the balance is
+ * refreshed.
  *
  * The credit is backed by real funds because the canister moves the tokens
  * itself inside deposit() before crediting — icrcApprove alone only grants the
@@ -61,7 +65,7 @@ const styles: Record<string, React.CSSProperties> = {
  */
 export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
     const { t } = useTranslation();
-    const { user, principal, getToken } = useOdinConnect();
+    const { user, principal, request, getToken } = useOdinConnect();
 
     const [holdings, setHoldings] = useState<OdinTokenWithBalance[]>([]);
     const [resolved, setResolved] = useState<Map<string, OdinToken>>(new Map());
@@ -140,10 +144,22 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
         };
     }, [balances, byId, resolved, getToken]);
 
-    const busy = stage === 'approving' || stage === 'crediting';
+    // This flow's ICRC-2 approval, if it is the SDK's latest request.
+    const approval = approvalFor(request, 'deposit');
+    // 'approving' is derived from the SDK state, so it is right in both modes
+    // (and simply absent after a redirect reload, when the result is in).
+    const shownStage: Stage =
+        approval?.request.status === 'pending' ? 'approving' : stage;
+    const busy = shownStage === 'approving' || shownStage === 'crediting';
 
-    const deposit = useCallback(async () => {
+    // 1. From the button: validate, then start the ICRC-2 approval of the app
+    //    canister to pull `raw` of this token. Not awaited — in a wallet
+    //    in-app browser the SDK redirects to Odin and the page reloads, so an
+    //    awaited promise would never return. The result arrives as
+    //    `request` and is handled by the effect below.
+    const deposit = useCallback(() => {
         setError(null);
+        setStage('idle');
 
         if (APP_CANISTER_ID === '') {
             setError(t('errors.noCanisterConfigured'));
@@ -171,49 +187,88 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
             return;
         }
 
-        // 1. Approve the app canister to pull `raw` of this token via ICRC-2.
-        //    Unlike a direct transfer this only grants an allowance — the
-        //    canister must call icrc2_transfer_from to actually move the funds.
-        setStage('approving');
-        let approved: boolean;
-        try {
-            approved = await user.icrcApprove({
-                token: holding.token.id,
-                spender: APP_CANISTER_ID,
-                amount: raw,
-            });
-        } catch (err) {
-            setStage('idle');
-            setError(t('deposit.errors.approvalFailed', { message: toMessage(err, t('errors.unexpected')) }));
-            return;
-        }
-        if (!approved) {
-            setStage('idle');
-            setError(t('errors.approvalRejected'));
-            return;
-        }
+        // Unlike a direct transfer this only grants an allowance — the
+        // canister must call icrc2_transfer_from to actually move the funds.
+        // `request.input` will carry { token, spender, amount }; `returnState`
+        // tags the approval as this flow's (withdraw approves too).
+        const returnState: ApprovalReturnState = { flow: 'deposit' };
+        void user.icrcApprove({
+            token: holding.token.id,
+            spender: APP_CANISTER_ID,
+            amount: raw,
+            returnState,
+        });
+    }, [user, principal, depositable, selectedId, amount, t]);
 
-        // 2. Pull the approved funds into the canister and credit the internal
-        //    ledger. deposit() runs icrc2_transfer_from then credits the caller.
+    // 2. When the approval settles (popup, or after the redirect reload): on
+    //    success, pull the approved funds into the canister and credit the
+    //    internal ledger — deposit() runs icrc2_transfer_from, then credits
+    //    the caller. Everything comes from `request.input`, not from form
+    //    state, which a redirect wipes.
+    //
+    //    "success" is only a UI signal; it is not trusted as proof of the
+    //    allowance. The canister's icrc2_transfer_from is the on-chain check:
+    //    without a real allowance it fails and nothing is credited.
+    useEffect(() => {
+        const current = approvalFor(request, 'deposit');
+        if (current === null) {
+            return;
+        }
+        const { id, status, input } = current.request;
+        if (status === 'rejected') {
+            if (claimRequest(id)) {
+                setError(t('errors.approvalRejected'));
+            }
+            return;
+        }
+        if (status === 'failed') {
+            if (claimRequest(id)) {
+                setError(
+                    t('deposit.errors.approvalFailed', {
+                        message: current.request.error ?? t('errors.unexpected'),
+                    }),
+                );
+            }
+            return;
+        }
+        if (status !== 'success') {
+            return;
+        }
+        if (user !== null && user.getIdentity() === null) {
+            // No delegation to call the canister with (should not happen:
+            // connect requests one whenever a canister id is configured).
+            if (claimRequest(id)) {
+                setError(t('errors.canisterUnavailableDeposit'));
+            }
+            return;
+        }
         if (actor === null) {
-            setStage('idle');
-            setError(t('errors.canisterUnavailableDeposit'));
+            // After a redirect reload the actor is still being built from the
+            // restored delegation; this effect re-runs once it exists.
             return;
         }
-        setStage('crediting');
-        try {
-            await actor.deposit(holding.token.id, raw);
-        } catch (err) {
-            setStage('idle');
-            setError(t('deposit.errors.depositFailed', { message: toMessage(err, t('errors.unexpected')) }));
+        // At most once per approval: claimed before the await, so re-renders,
+        // StrictMode and remounts cannot deposit twice.
+        if (!claimRequest(id)) {
             return;
         }
+        void (async () => {
+            setError(null);
+            setStage('crediting');
+            try {
+                await actor.deposit(input.token, input.amount);
+            } catch (err) {
+                setStage('idle');
+                setError(t('deposit.errors.depositFailed', { message: toMessage(err, t('errors.unexpected')) }));
+                return;
+            }
 
-        setStage('done');
-        setAmount('');
-        await refresh();
-        void loadHoldings();
-    }, [user, principal, actor, depositable, selectedId, amount, refresh, loadHoldings, t]);
+            setStage('done');
+            setAmount('');
+            await refresh();
+            void loadHoldings();
+        })();
+    }, [request, user, actor, refresh, loadHoldings, t]);
 
     return (
         <section style={styles.card}>
@@ -247,12 +302,12 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                 <button
                     type="button"
                     style={styles.button}
-                    onClick={() => void deposit()}
+                    onClick={deposit}
                     disabled={busy || selectedId === '' || amount === ''}
                 >
-                    {stage === 'approving'
+                    {shownStage === 'approving'
                         ? t('deposit.awaitingApproval')
-                        : stage === 'crediting'
+                        : shownStage === 'crediting'
                           ? t('deposit.crediting')
                           : t('deposit.submit')}
                 </button>
@@ -263,7 +318,7 @@ export function DepositForm({ actor, balances, refresh }: DepositFormProps) {
                     {error}
                 </div>
             ) : null}
-            {stage === 'done' && error === null ? (
+            {shownStage === 'done' && error === null ? (
                 <div style={styles.ok}>{t('deposit.credited')}</div>
             ) : null}
 

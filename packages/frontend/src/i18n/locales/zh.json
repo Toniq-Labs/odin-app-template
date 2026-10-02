@@ -63,6 +63,8 @@
         "tokenInfoLoading": "代币信息仍在加载——请稍后重试。",
         "insufficientBalance": "内部余额不足。",
         "unexpected": "发生意外错误",
-        "connectFailed": "连接 Odin 失败"
+        "connectFailed": "连接 Odin 失败",
+        "connectRejected": "已在 Odin 中取消或拒绝登录。",
+        "connectUnverified": "无法验证登录，请重试。"
     }
 }

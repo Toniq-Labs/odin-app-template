@@ -63,6 +63,8 @@
         "tokenInfoLoading": "Token info still loading — try again in a moment.",
         "insufficientBalance": "Insufficient internal balance.",
         "unexpected": "Unexpected error",
-        "connectFailed": "Failed to connect to Odin"
+        "connectFailed": "Failed to connect to Odin",
+        "connectRejected": "Sign-in was cancelled or rejected in Odin.",
+        "connectUnverified": "Could not verify the sign-in. Please try again."
     }
 }
