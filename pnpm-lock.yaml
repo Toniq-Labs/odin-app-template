@@ -42,8 +42,8 @@ importers:
         specifier: ^8.2.1
         version: 8.2.1
       odin-connect:
-        specifier: ^1.6.0
-        version: 1.6.0(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
+        specifier: ^2.0.1
+        version: 2.0.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
       react:
         specifier: ^19.2.0
         version: 19.2.7
@@ -1441,8 +1441,8 @@ packages:
   nwsapi@2.2.24:
     resolution: {integrity: sha512-7YRhZ3jS45LwmSCT4b2sVFHt/WuovaktDU07QrtOBY2PXskss5a9jfmR9jptyumwXST+rFjrmppMY1KT/yn35A==}
 
-  odin-connect@1.6.0:
-    resolution: {integrity: sha512-4DKXDTnODdyiR+s/8ZwnUdHdZSvmZKynD8ORquLJWWFxxi6bhHs0wciTfUxJ0ULMPo0rqvlm87EmoCEi1RfVLw==}
+  odin-connect@2.0.1:
+    resolution: {integrity: sha512-VODDkPtsO7Ht3PC0fVd0NXkj9pVfKJJ/El5sx3pHEkZBXpvaB9KiaGeBVOZhwZ/1YD4OWLm59bDbiSQ5n+EuiQ==}
 
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
@@ -2892,15 +2892,15 @@ snapshots:
 
   nwsapi@2.2.24: {}
 
-  odin-connect@1.6.0(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
+  odin-connect@2.0.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
     dependencies:
       '@apimatic/json-bigint': 1.2.0
       '@dfinity/identity': 3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
+      '@dfinity/principal': 3.4.3
       axios: 1.18.0
     transitivePeerDependencies:
       - '@dfinity/agent'
       - '@dfinity/candid'
-      - '@dfinity/principal'
       - '@noble/curves'
       - '@noble/hashes'
       - debug
