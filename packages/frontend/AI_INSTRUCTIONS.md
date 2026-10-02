@@ -47,6 +47,16 @@ dfx `frontend` asset canister serves.
   components/hooks as they grow.
 - Prefer the `odin-connect` SDK for auth and canister actor wiring over rolling
   your own agent setup.
+- **odin-connect 2.x: render from state, never from an awaited call.** Use the
+  single instance in `src/odin/client.ts` (never `new OdinConnect` elsewhere)
+  and `useOdinState()` / `useOdinConnect()`. Start `connect()` and
+  `user.<action>()` from handlers without awaiting them; put the follow-up in
+  an effect keyed on `request.action` + `request.status` (+ a `returnState`
+  tag), reading arguments from `request.input` / `returnState`. Value-moving
+  follow-ups run at most once per `request.id` (`claimRequest`). Never call
+  `connect()` automatically on a `rejected` / `unverified` request. Keep the
+  default `mode: "auto"` so wallet in-app browsers work. See the root README's
+  "Odin Connect in the frontend" and the SDK's `MIGRATION-2.0.md`.
 
 ## Build & test
 

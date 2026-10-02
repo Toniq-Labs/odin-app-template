@@ -138,7 +138,7 @@ export function AuthBar() {
             <button
                 type="button"
                 style={styles.button}
-                onClick={() => void connect()}
+                onClick={connect}
                 disabled={connecting}
             >
                 {connecting ? t('auth.connecting') : t('auth.connect')}

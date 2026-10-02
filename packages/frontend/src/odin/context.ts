@@ -1,13 +1,22 @@
 import { createContext } from 'react';
-import type { OdinConnectedUser, OdinToken, OdinUser } from 'odin-connect';
+import type {
+    OdinConnectedUser,
+    OdinRequestState,
+    OdinToken,
+    OdinUser,
+} from 'odin-connect';
 
 /**
- * Auth lifecycle:
- *   restoring     — checking localStorage for a prior session on mount
+ * Auth lifecycle, derived from the odin-connect state store (see
+ * `deriveAuthStatus`):
+ *   restoring     — the SDK is restoring the stored session / reading a
+ *                   returning redirect result (`state.status: "initializing"`)
  *   disconnected  — no session; awaiting a connect()
- *   connecting    — Odin approval popup is open
+ *   connecting    — a connect is pending: the Odin popup is open, or the tab
+ *                   is on its way to Odin (redirect mode)
  *   connected     — authenticated; `principal` (and usually `profile`) set
- *   error         — last connect attempt failed; see `error`
+ *   error         — the last connect was rejected, failed or could not be
+ *                   verified; see `error`. Never retried automatically.
  */
 export type OdinAuthStatus =
     | 'restoring'
@@ -29,8 +38,18 @@ export interface OdinConnectContextValue {
     user: OdinConnectedUser | null;
     /** Human-readable error from the last failed connect, if any. */
     error: string | null;
-    /** Open the Odin approval popup and establish a session. */
-    connect: () => Promise<void>;
+    /**
+     * The latest `connect()` or action (`user.icrcApprove()`, …) and its
+     * outcome, straight from the SDK state. Flows react to it instead of
+     * awaiting the call: in redirect mode the page reloads before an awaited
+     * promise could return.
+     */
+    request: OdinRequestState | null;
+    /**
+     * Start a connect (popup, or a redirect in wallet in-app browsers). The
+     * outcome arrives through `status` / `request`, not a return value.
+     */
+    connect: () => void;
     /** Clear the session (in this tab and all tabs on the same origin). */
     disconnect: () => void;
     /**
