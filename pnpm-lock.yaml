@@ -42,8 +42,8 @@ importers:
         specifier: ^8.2.1
         version: 8.2.1
       odin-connect:
-        specifier: ^2.0.1
-        version: 2.0.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
+        specifier: ^2.0.2
+        version: 2.0.2(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
       react:
         specifier: ^19.2.0
         version: 19.2.7
@@ -1067,8 +1067,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  axios@1.18.0:
-    resolution: {integrity: sha512-E32NzpYKp++W7XRe52rHiXV2ehxmh3wbdgO7MHeFM+vqxLBYHzt0ElkiImtOBxtOmyp0yoC8C6uESVV84Y2/hw==}
+  axios@1.20.0:
+    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
 
   azle@0.33.0:
     resolution: {integrity: sha512-LVq3P4j/zAHoPZ/kn7kAR3MNzyFFp7rpLYLKBs/JeEDTW0KoAqaafmVBjc64zSKZUE4JZaRCExGNNaumypDgoA==}
@@ -1441,8 +1441,8 @@ packages:
   nwsapi@2.2.24:
     resolution: {integrity: sha512-7YRhZ3jS45LwmSCT4b2sVFHt/WuovaktDU07QrtOBY2PXskss5a9jfmR9jptyumwXST+rFjrmppMY1KT/yn35A==}
 
-  odin-connect@2.0.1:
-    resolution: {integrity: sha512-VODDkPtsO7Ht3PC0fVd0NXkj9pVfKJJ/El5sx3pHEkZBXpvaB9KiaGeBVOZhwZ/1YD4OWLm59bDbiSQ5n+EuiQ==}
+  odin-connect@2.0.2:
+    resolution: {integrity: sha512-oakibmhmnHsZpdqqu6sMvdqRgtJBNdnzHDTzQYAYYGFcCsHq3Trat440o0r4SkwrHBooe7cWpS7l5Tj4zRCXrw==}
 
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
@@ -2476,7 +2476,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  axios@1.18.0:
+  axios@1.20.0:
     dependencies:
       follow-redirects: 1.16.0
       form-data: 4.0.6
@@ -2892,12 +2892,12 @@ snapshots:
 
   nwsapi@2.2.24: {}
 
-  odin-connect@2.0.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
+  odin-connect@2.0.2(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@noble/curves@1.9.7)(@noble/hashes@1.8.0):
     dependencies:
       '@apimatic/json-bigint': 1.2.0
       '@dfinity/identity': 3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
       '@dfinity/principal': 3.4.3
-      axios: 1.18.0
+      axios: 1.20.0
     transitivePeerDependencies:
       - '@dfinity/agent'
       - '@dfinity/candid'

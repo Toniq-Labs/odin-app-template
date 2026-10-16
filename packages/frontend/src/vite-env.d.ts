@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_ODIN_APP_NAME?: string;
-  readonly VITE_ODIN_ENV?: 'prod' | 'dev' | 'local';
+  readonly VITE_ODIN_ENV?: 'prod' | 'staging' | 'dev' | 'local';
 }
 
 interface ImportMeta {

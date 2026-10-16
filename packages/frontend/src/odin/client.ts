@@ -1,6 +1,6 @@
 import { OdinConnect } from 'odin-connect';
 
-type OdinEnv = 'prod' | 'dev' | 'local';
+type OdinEnv = 'prod' | 'staging' | 'dev' | 'local';
 
 /**
  * App name + environment shown on the Odin approval page. Configurable via
