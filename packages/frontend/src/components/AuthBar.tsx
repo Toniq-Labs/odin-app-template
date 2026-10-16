@@ -10,11 +10,6 @@ function shortPrincipal(principal: string): string {
     return `${principal.slice(0, 6)}…${principal.slice(-5)}`;
 }
 
-/** Odin CDN avatar for a user, keyed by principal. */
-function avatarUrl(principal: string): string {
-    return `https://images.odin.fun/v2/user/${principal}`;
-}
-
 const styles: Record<string, React.CSSProperties> = {
     bar: {
         display: 'flex',
@@ -92,20 +87,21 @@ const styles: Record<string, React.CSSProperties> = {
  */
 export function AuthBar() {
     const { t } = useTranslation();
-    const { status, principal, profile, error, connect, disconnect } =
+    const { status, principal, profile, user, error, connect, disconnect } =
         useOdinConnect();
 
     if (status === 'restoring') {
         return <div style={styles.bar}>{t('auth.restoring')}</div>;
     }
 
-    if (status === 'connected' && principal !== null) {
+    if (status === 'connected' && principal !== null && user !== null) {
         return (
             <div style={styles.bar}>
                 <div style={styles.identity}>
                     {profile?.image ? (
                         <img
-                            src={avatarUrl(principal)}
+                            // Env-aware (dev/local/prod image hosts differ).
+                            src={user.buildAvatarImageUrl()}
                             alt={profile.username}
                             style={styles.avatar}
                         />

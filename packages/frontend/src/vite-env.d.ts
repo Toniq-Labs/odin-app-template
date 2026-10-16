@@ -2,7 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_ODIN_APP_NAME?: string;
-  readonly VITE_ODIN_ENV?: 'prod' | 'dev' | 'local';
+  // Validated at runtime by `parseOdinEnv` in `src/odin/client.ts`.
+  readonly VITE_ODIN_ENV?: string;
 }
 
 interface ImportMeta {
