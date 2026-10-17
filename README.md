@@ -143,7 +143,10 @@ dfx deploy frontend   # build + deploy the frontend asset canister
 
 The canister takes the **Odin ledger** it holds funds on as a required init
 argument (see [Odin ledger](#odin-ledger)). `pnpm deploy:dev` / `pnpm
-deploy:prod` pass it for you; a bare `dfx deploy` prompts for it.
+deploy:prod` pass it for you; a bare `dfx deploy` prompts for it. The frontend
+asset canister does not depend on the app canister in `dfx.json` (it gets the
+canister id from `VITE_APP_CANISTER_ID`), so `dfx deploy frontend` never
+redeploys the canister without its argument.
 
 > If `pnpm install` ran before `dfx` was installed, register the azle dfx extension manually:
 >

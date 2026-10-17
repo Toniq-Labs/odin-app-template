@@ -6,8 +6,7 @@
     },
     "frontend": {
       "type": "assets",
-      "source": ["packages/frontend/dist"],
-      "dependencies": ["canister"]
+      "source": ["packages/frontend/dist"]
     }
   },
   "defaults": {
