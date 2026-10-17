@@ -14,6 +14,8 @@
     "build": "pnpm build:frontend && pnpm build:canister",
     "build:canister": "dfx build canister --check",
     "build:frontend": "pnpm --filter @odin-app/frontend build",
+    "deploy:dev": "dfx deploy canister --argument '(record { ledger_id = principal \"w5cxm-6iaaa-aaaaj-az4jq-cai\" })'",
+    "deploy:prod": "dfx deploy canister --argument '(record { ledger_id = principal \"yspgd-ciaaa-aaaaj-a6rrq-cai\" })'",
     "dev:frontend": "pnpm --filter @odin-app/frontend dev",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"

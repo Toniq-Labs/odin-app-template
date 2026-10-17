@@ -12,12 +12,10 @@ import { Principal } from '@dfinity/principal';
  *   - withdraw sends funds back via `icrc1_transfer`
  * both from/to the caller's and this canister's per-token subaccount.
  *
- * The id is the prod Odin ledger (`yspgd`). Dev is `w5cxm`; staging/prod share
- * `yspgd`. A fork targeting dev should change this constant.
+ * The ledger principal differs per Odin environment, so every function takes
+ * it as its first argument. The canister reads it from the `ledger_id` init
+ * argument; see odin_ledger.ts for the known ids.
  */
-export const ODIN_LEDGER_CANISTER_ID = Principal.fromText(
-    'yspgd-ciaaa-aaaaj-a6rrq-cai',
-);
 
 /** Odin's BTC token id — the asset the flat ledger fee is denominated in. */
 export const ODIN_BTC_TOKEN_ID = 'btc';
@@ -91,9 +89,12 @@ function stringifyError(err: Record<string, unknown>): string {
  * The subaccount under which `tokenId`'s balance is stored on the Odin ledger.
  * Both the depositor's approval and this canister's holdings live here.
  */
-async function tokenPointer(tokenId: string): Promise<Uint8Array> {
+async function tokenPointer(
+    ledger: Principal,
+    tokenId: string,
+): Promise<Uint8Array> {
     return await call<[string], Uint8Array>(
-        ODIN_LEDGER_CANISTER_ID,
+        ledger,
         'odin_token_pointer',
         {
             args: [tokenId],
@@ -104,7 +105,7 @@ async function tokenPointer(tokenId: string): Promise<Uint8Array> {
 }
 
 /**
- * Pull `amount` of `tokenId` from `from` into `to` using the ICRC-2 allowance
+ * Pull `amount` of `tokenId` on `ledger` from `from` into `to` using the ICRC-2 allowance
  * the depositor granted (spender = `to`). Returns the block index; throws with
  * the decoded error on failure.
  *
@@ -112,14 +113,15 @@ async function tokenPointer(tokenId: string): Promise<Uint8Array> {
  * credit is only recorded for funds that actually settled into this canister.
  */
 export async function odinPullToken(
+    ledger: Principal,
     tokenId: string,
     from: Principal,
     to: Principal,
     amount: bigint,
 ): Promise<bigint> {
-    const subaccount = await tokenPointer(tokenId);
+    const subaccount = await tokenPointer(ledger, tokenId);
     const result = await call<[unknown], TransferResultValue>(
-        ODIN_LEDGER_CANISTER_ID,
+        ledger,
         'icrc2_transfer_from',
         {
             args: [
@@ -151,17 +153,18 @@ export async function odinPullToken(
 
 /**
  * Send `amount` of `tokenId` from this canister's per-token subaccount back to
- * `to`'s per-token subaccount on the Odin ledger. Returns the block index;
+ * `to`'s per-token subaccount on the Odin `ledger`. Returns the block index;
  * throws with the decoded error on failure so withdraw can refund.
  */
 export async function odinSendToken(
+    ledger: Principal,
     tokenId: string,
     to: Principal,
     amount: bigint,
 ): Promise<bigint> {
-    const subaccount = await tokenPointer(tokenId);
+    const subaccount = await tokenPointer(ledger, tokenId);
     const result = await call<[unknown], TransferResultValue>(
-        ODIN_LEDGER_CANISTER_ID,
+        ledger,
         'icrc1_transfer',
         {
             args: [
