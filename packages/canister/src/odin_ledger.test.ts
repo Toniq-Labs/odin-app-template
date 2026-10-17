@@ -19,14 +19,22 @@ describe('validateLedgerId', () => {
 
     it('rejects the anonymous principal', () => {
         expect(() => validateLedgerId(Principal.anonymous())).toThrow(
-            /anonymous/,
+            /not a known Odin ledger/,
         );
     });
 
     it('rejects the management canister', () => {
         expect(() =>
             validateLedgerId(Principal.managementCanister()),
-        ).toThrow(/management/);
+        ).toThrow(/not a known Odin ledger/);
+    });
+
+    it('rejects any other canister principal', () => {
+        // A well-formed canister id that is not an Odin ledger (ICP ledger).
+        const other = Principal.fromText('ryjl3-tyaaa-aaaaa-aaaba-cai');
+        expect(() => validateLedgerId(other)).toThrow(
+            /not a known Odin ledger/,
+        );
     });
 });
 
@@ -62,6 +70,6 @@ describe('resolveUpgradeLedgerId', () => {
     it('rejects an invalid upgrade arg', () => {
         expect(() =>
             resolveUpgradeLedgerId(ODIN_LEDGER_IDS.prod, Principal.anonymous()),
-        ).toThrow(/anonymous/);
+        ).toThrow(/not a known Odin ledger/);
     });
 });

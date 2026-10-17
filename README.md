@@ -206,7 +206,9 @@ Each Odin environment has its own ledger canister:
 | prod / staging   | `prod`, `staging`| `yspgd-ciaaa-aaaaj-a6rrq-cai`   |
 
 The canister takes the ledger as its init argument,
-`(record { ledger_id = principal "<ledger>" })`, and the frontend's
+`(record { ledger_id = principal "<ledger>" })`, and rejects any principal not
+in the table above (`ODIN_LEDGER_IDS` in
+[`odin_ledger.ts`](packages/canister/src/odin_ledger.ts)). The frontend's
 `VITE_ODIN_ENV` **must match it** — otherwise users approve on one ledger while
 the canister pulls from another, and deposits fail.
 

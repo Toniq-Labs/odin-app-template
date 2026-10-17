@@ -24,17 +24,23 @@ export const ODIN_LEDGER_IDS = {
 export const LEGACY_ODIN_LEDGER_ID = ODIN_LEDGER_IDS.prod;
 
 /**
- * Reject principals that can never be an Odin ledger canister. Returns the
- * principal's text form for storage.
+ * Accept only a known Odin ledger (`ODIN_LEDGER_IDS`). The ledger is
+ * immutable, so a typo'd or wrong principal would brick deposits and
+ * withdrawals until a reinstall wipes balances; rejecting it at install time
+ * is the only safe point. Returns the principal's text form for storage.
+ *
+ * If Odin adds or rotates a ledger, add it to `ODIN_LEDGER_IDS`.
  */
 export function validateLedgerId(ledgerId: Principal): string {
-    if (ledgerId.isAnonymous()) {
-        throw new Error('ledger_id must not be the anonymous principal');
+    const text = ledgerId.toText();
+    const known: readonly string[] = Object.values(ODIN_LEDGER_IDS);
+    if (!known.includes(text)) {
+        throw new Error(
+            `ledger_id ${text} is not a known Odin ledger. Expected one of: ` +
+                known.join(', '),
+        );
     }
-    if (ledgerId.toText() === Principal.managementCanister().toText()) {
-        throw new Error('ledger_id must not be the management canister');
-    }
-    return ledgerId.toText();
+    return text;
 }
 
 /**
