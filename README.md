@@ -137,8 +137,13 @@ rustup target add wasm32-unknown-unknown
 ```sh
 pnpm install          # install workspace deps (auto-installs the azle dfx extension if dfx is on PATH)
 dfx start --clean --background
-dfx deploy            # build + deploy canister and frontend
+pnpm deploy:dev       # build + deploy the canister against the Odin dev ledger
+dfx deploy frontend   # build + deploy the frontend asset canister
 ```
+
+The canister takes the **Odin ledger** it holds funds on as a required init
+argument (see [Odin ledger](#odin-ledger)). `pnpm deploy:dev` / `pnpm
+deploy:prod` pass it for you; a bare `dfx deploy` prompts for it.
 
 > If `pnpm install` ran before `dfx` was installed, register the azle dfx extension manually:
 >
@@ -159,9 +164,11 @@ pnpm dev:frontend
 | `pnpm build`           | Build all workspace packages         |
 | `pnpm build:canister`  | Build the Azle canister              |
 | `pnpm build:frontend`  | Build the frontend                   |
+| `pnpm deploy:dev`      | Deploy the canister on the Odin dev ledger |
+| `pnpm deploy:prod`     | Deploy the canister on the Odin prod/staging ledger |
 | `pnpm dev:frontend`    | Start the Vite dev server            |
 | `pnpm typecheck`       | Type-check all packages              |
-| `pnpm test`            | Run unit tests (ledger)              |
+| `pnpm test`            | Run unit tests (ledger, ledger id)   |
 
 ## Canister API
 
@@ -172,6 +179,7 @@ pnpm dev:frontend
 | `getBalance`    | query  | Caller's internal balance for one token.                          |
 | `getBalances`   | query  | All of the caller's `(token, balance)` pairs.                     |
 | `getOwner`      | query  | The configured owner principal, or empty if not yet initialized.  |
+| `getOdinLedger` | update | The Odin ledger canister this canister holds funds on (certified). |
 | `icrc28_trusted_origins` | update | [ICRC-28](https://github.com/dfinity/wg-identity-authentication) trusted origins — the web origins allowed to request signed calls. Odin Connect calls this before issuing a delegation and refuses auth if your app's origin is not listed. |
 
 > **ICRC-28 / Odin Connect auth:** the trusted origins are configured in
@@ -187,6 +195,38 @@ Tokens are identified by their **Odin token id** (text), not an ICRC ledger
 principal — every Odin token shares one ledger and is addressed by subaccount
 (`odin_token_pointer`). Balances are keyed by `(owner, tokenId)` and stored in
 stable memory, so they survive upgrades.
+
+### Odin ledger
+
+Each Odin environment has its own ledger canister:
+
+| Environment      | `VITE_ODIN_ENV`  | Ledger canister                 |
+| ---------------- | ---------------- | ------------------------------- |
+| dev              | `dev`            | `w5cxm-6iaaa-aaaaj-az4jq-cai`   |
+| prod / staging   | `prod`, `staging`| `yspgd-ciaaa-aaaaj-a6rrq-cai`   |
+
+The canister takes the ledger as its init argument,
+`(record { ledger_id = principal "<ledger>" })`, and the frontend's
+`VITE_ODIN_ENV` **must match it** — otherwise users approve on one ledger while
+the canister pulls from another, and deposits fail.
+
+The ledger is **immutable after install**. Every internal balance is backed by
+tokens held on that ledger, so switching ledgers would let withdrawals pay out
+funds that were never deposited there. On upgrade, pass the same argument again
+(`pnpm deploy:dev` / `pnpm deploy:prod` do this); an upgrade naming a different
+ledger traps and the old code keeps running. To change environment, reinstall
+(`dfx deploy canister --mode reinstall …`, which **wipes all balances** —
+only on a canister holding no funds) or deploy a new canister.
+
+Canisters installed before the ledger became an init argument were hardcoded to
+the prod ledger; their first upgrade must pass the prod ledger id, which is then
+recorded.
+
+Verify a deployed canister's ledger with:
+
+```sh
+dfx canister call canister getOdinLedger '()' --network ic
+```
 
 ### Withdrawal fees
 
@@ -225,7 +265,8 @@ cover both. See `ODIN_BTC_FEE` in
 
    ```sh
    pnpm build                       # frontend dist + canister type check
-   dfx deploy --network ic          # deploy canister + frontend asset canister
+   pnpm deploy:prod --network ic    # canister on the prod/staging ledger (or deploy:dev)
+   dfx deploy frontend --network ic # frontend asset canister
    ```
 
 3. The deploying principal is recorded as the **owner** (see `@init` in

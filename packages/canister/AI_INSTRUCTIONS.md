@@ -14,8 +14,9 @@ ICRC-1 canister principal.
 src/
   index.ts      # canister class — endpoints + StableBTreeMap wiring
   ledger.ts     # pure ledger logic (key encoding, validation, balance math)
-  icrc1.ts      # minimal ICRC-1 icrc1_transfer client
-  ledger.test.ts# vitest unit tests for the pure logic
+  odin.ts       # Odin ledger client (icrc2_transfer_from / icrc1_transfer)
+  odin_ledger.ts# pure Odin ledger-id validation + upgrade immutability rule
+  *.test.ts     # vitest unit tests for the pure logic
 ```
 
 ## Hard rules
@@ -34,6 +35,10 @@ src/
    — precision loss is a fund-loss bug.
 5. **Validate every update-call input.** Reuse `validateAmount`; reject zero,
    negative, and over-max values.
+6. **The Odin ledger id is immutable after install.** It is the `ledger_id`
+   init argument, stored in `config`. Do not add a setter, and do not weaken
+   `resolveUpgradeLedgerId` in `postUpgrade`: every balance is backed by funds
+   on that one ledger, so switching it lets withdrawals pay out unbacked funds.
 
 ## Patterns to follow
 
