@@ -104,8 +104,9 @@ export default class {
      * and the old wasm keeps running.
      *
      * Canisters installed before `ledger_id` was an init argument have no
-     * stored id; they were hardcoded to the prod ledger, so they are migrated
-     * to it here (and only to it).
+     * stored id; their first upgrade records whichever known ledger the
+     * argument names (the one their old build was hardcoded to), and it is
+     * immutable from then on.
      */
     @postUpgrade([InitArgsIdl])
     upgrade(args: InitArgs): void {

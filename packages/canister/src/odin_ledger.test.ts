@@ -2,7 +2,6 @@ import { Principal } from '@dfinity/principal';
 import { describe, expect, it } from 'vitest';
 
 import {
-    LEGACY_ODIN_LEDGER_ID,
     ODIN_LEDGER_IDS,
     resolveUpgradeLedgerId,
     validateLedgerId,
@@ -54,17 +53,19 @@ describe('resolveUpgradeLedgerId', () => {
         ).toThrow(/immutable/);
     });
 
-    it('migrates a legacy canister (no stored id) to the prod ledger', () => {
-        expect(LEGACY_ODIN_LEDGER_ID).toBe(ODIN_LEDGER_IDS.prod);
+    it('records the requested ledger for a legacy canister (no stored id)', () => {
         expect(resolveUpgradeLedgerId(undefined, PROD)).toBe(
             ODIN_LEDGER_IDS.prod,
         );
+        expect(resolveUpgradeLedgerId(undefined, DEV)).toBe(
+            ODIN_LEDGER_IDS.dev,
+        );
     });
 
-    it('rejects moving a legacy canister off the prod ledger', () => {
-        expect(() => resolveUpgradeLedgerId(undefined, DEV)).toThrow(
-            /immutable/,
-        );
+    it('rejects an unknown ledger for a legacy canister', () => {
+        expect(() =>
+            resolveUpgradeLedgerId(undefined, Principal.anonymous()),
+        ).toThrow(/not a known Odin ledger/);
     });
 
     it('rejects an invalid upgrade arg', () => {

@@ -220,9 +220,15 @@ ledger traps and the old code keeps running. To change environment, reinstall
 (`dfx deploy canister --mode reinstall …`, which **wipes all balances** —
 only on a canister holding no funds) or deploy a new canister.
 
-Canisters installed before the ledger became an init argument were hardcoded to
-the prod ledger; their first upgrade must pass the prod ledger id, which is then
-recorded.
+**Upgrading a canister installed before the ledger became an init argument.**
+Its ledger was a constant in `packages/canister/src/odin.ts`, and the canister
+has no record of it, so its first upgrade records whatever ledger you pass —
+**permanently**. Before upgrading, check `odin.ts` at the commit you actually
+deployed (`git show <deployed-commit>:packages/canister/src/odin.ts`) and use
+the matching script: `pnpm deploy:prod` for `yspgd-…`, `pnpm deploy:dev` for
+`w5cxm-…`. Passing the wrong ledger leaves every balance unbacked, and the only
+way out is a reinstall that wipes them. After the upgrade, confirm it with
+`getOdinLedger` below.
 
 Verify a deployed canister's ledger with:
 

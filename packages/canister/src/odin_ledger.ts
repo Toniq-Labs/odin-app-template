@@ -18,12 +18,6 @@ export const ODIN_LEDGER_IDS = {
 } as const;
 
 /**
- * The ledger every canister installed before the ledger became an init
- * argument was hardcoded to. Used only to migrate those canisters on upgrade.
- */
-export const LEGACY_ODIN_LEDGER_ID = ODIN_LEDGER_IDS.prod;
-
-/**
  * Accept only a known Odin ledger (`ODIN_LEDGER_IDS`). The ledger is
  * immutable, so a typo'd or wrong principal would brick deposits and
  * withdrawals until a reinstall wipes balances; rejecting it at install time
@@ -51,19 +45,27 @@ export function validateLedgerId(ledgerId: Principal): string {
  * The ledger is immutable: the upgrade argument must name the ledger already
  * in use, or the upgrade is rejected. Switching environments means a reinstall
  * or a new canister.
+ *
+ * Legacy canisters (no stored id) had the ledger hardcoded in their old wasm,
+ * which the upgrade replaces, so the canister cannot know which one it used:
+ * forks could point at either environment. The operator's argument is taken
+ * as that ledger, once, and is immutable from then on. Passing the wrong one
+ * here is the one unrecoverable mistake — see the README migration note.
  */
 export function resolveUpgradeLedgerId(
     stored: string | undefined,
     requested: Principal,
 ): string {
-    const current = stored ?? LEGACY_ODIN_LEDGER_ID;
     const next = validateLedgerId(requested);
-    if (next !== current) {
+    if (stored === undefined) {
+        return next;
+    }
+    if (next !== stored) {
         throw new Error(
-            `ledger_id is immutable: canister uses ${current}, upgrade ` +
+            `ledger_id is immutable: canister uses ${stored}, upgrade ` +
                 `requested ${next}. Reinstall or deploy a new canister to ` +
                 'switch Odin environments.',
         );
     }
-    return current;
+    return stored;
 }
