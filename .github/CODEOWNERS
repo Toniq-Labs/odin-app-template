@@ -1,0 +1,24 @@
+# Code owners for odin-app-template.
+#
+# These paths hold the security-sensitive ledger code and the guardrails around
+# it (see CLAUDE.md). With "Require review from Code Owners" enabled on `main`,
+# any PR touching them needs approval from @Toniq-Labs/odin-connect-maintainers.
+
+# Hardened ledger core: validateAmount, credit, debit
+/packages/canister/src/ledger.ts            @Toniq-Labs/odin-connect-maintainers
+
+# withdraw (checks-effects-interactions) and deposit (interaction-before-effect) ordering
+/packages/canister/src/index.ts             @Toniq-Labs/odin-connect-maintainers
+
+# Invariant tests guarding the ledger core
+/packages/canister/src/ledger.test.ts       @Toniq-Labs/odin-connect-maintainers
+
+# CI gates
+/.github/workflows/ci.yml                   @Toniq-Labs/odin-connect-maintainers
+
+# This file, so owners can't be removed without review
+/.github/CODEOWNERS                         @Toniq-Labs/odin-connect-maintainers
+
+# Guardrail docs for AI assistants
+/CLAUDE.md                                  @Toniq-Labs/odin-connect-maintainers
+/packages/*/AI_INSTRUCTIONS.md              @Toniq-Labs/odin-connect-maintainers
