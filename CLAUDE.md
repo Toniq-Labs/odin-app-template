@@ -45,6 +45,11 @@ Sections that must not change are marked inline with `⚠️ AI-GUARD` and the
 `AI: do not modify this section` sentinel. If a task seems to require touching
 guarded code, STOP and surface it to a human instead of editing.
 
+This sign-off is enforced, not just requested: `.github/CODEOWNERS` assigns the
+guarded files, CI config, and these guardrail docs to
+`@Toniq-Labs/odin-connect-maintainers`, and branch protection on `main` requires
+code-owner review before merge.
+
 ## Invariants (never violate)
 
 1. Every credited balance is backed by a real deposit. `deposit` is the only
