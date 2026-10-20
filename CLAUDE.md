@@ -75,7 +75,8 @@ pnpm build                   # frontend dist + dfx build canister --check
 
 # Local replica
 dfx start --clean --background
-dfx deploy                   # builds + deploys canister and frontend
+pnpm deploy:dev              # canister on the Odin dev ledger (or deploy:prod)
+dfx deploy frontend          # frontend asset canister (independent of canister)
 ```
 
 CI (`.github/workflows/ci.yml`) runs typecheck, test, frontend build, and

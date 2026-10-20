@@ -3,6 +3,7 @@ import {
     IDL,
     init,
     msgCaller,
+    postUpgrade,
     query,
     StableBTreeMap,
     update,
@@ -16,6 +17,17 @@ import {
     odinSendToken,
 } from './odin';
 import { credit, debit, makeKey, parseKey, validateAmount } from './ledger';
+import { resolveUpgradeLedgerId, validateLedgerId } from './odin_ledger';
+
+/**
+ * Install/upgrade argument. `ledger_id` is the Odin ledger canister this
+ * canister holds funds on — dev and prod/staging use different ledgers (see
+ * odin_ledger.ts and the `deploy:dev` / `deploy:prod` scripts). It is fixed at
+ * install and cannot change on upgrade.
+ */
+const InitArgsIdl = IDL.Record({ ledger_id: IDL.Principal });
+
+type InitArgs = { ledger_id: Principal };
 
 /**
  * ⚠️ EDIT BEFORE DEPLOY — must list the exact origin(s) your frontend is served
@@ -63,7 +75,10 @@ export default class {
     /** (owner|token) → balance. Memory id 0. */
     ledger = new StableBTreeMap<string, bigint>(0);
 
-    /** Canister config (e.g. the deploying admin principal). Memory id 1. */
+    /**
+     * Canister config (the deploying admin principal and the Odin ledger id).
+     * Memory id 1.
+     */
     config = new StableBTreeMap<string, string>(1);
 
     /**
@@ -71,10 +86,44 @@ export default class {
      * (e.g. for future admin-gated endpoints). Deposits are NOT owner-gated:
      * `deposit` is permissionless and self-verifying (it pulls the caller's own
      * pre-approved funds before crediting), so no trusted minter is needed.
+     *
+     * Also records the Odin ledger this canister holds funds on. It is
+     * immutable from here on — see `upgrade`.
      */
-    @init([])
-    initialize(): void {
+    @init([InitArgsIdl])
+    initialize(args: InitArgs): void {
         this.config.insert('owner', msgCaller().toText());
+        this.config.insert('ledger_id', validateLedgerId(args.ledger_id));
+    }
+
+    /**
+     * Enforce that the Odin ledger never changes across upgrades: every
+     * internal balance is backed by tokens held on the current ledger, so a
+     * switch would let withdrawals pay out funds never deposited there. The
+     * upgrade argument must repeat the current ledger id, or the upgrade traps
+     * and the old wasm keeps running.
+     *
+     * Canisters installed before `ledger_id` was an init argument have no
+     * stored id; their first upgrade records whichever known ledger the
+     * argument names (the one their old build was hardcoded to), and it is
+     * immutable from then on.
+     */
+    @postUpgrade([InitArgsIdl])
+    upgrade(args: InitArgs): void {
+        const ledgerId = resolveUpgradeLedgerId(
+            this.config.get('ledger_id'),
+            args.ledger_id,
+        );
+        this.config.insert('ledger_id', ledgerId);
+    }
+
+    /** The Odin ledger canister this canister holds funds on. */
+    private odinLedger(): Principal {
+        const ledgerId = this.config.get('ledger_id');
+        if (ledgerId === undefined) {
+            throw new Error('ledger_id not configured');
+        }
+        return Principal.fromText(ledgerId);
     }
 
     /**
@@ -103,7 +152,13 @@ export default class {
 
         // INTERACTION: pull the pre-approved funds into this canister. Throws if
         // the allowance or balance is insufficient — no credit happens then.
-        await odinPullToken(tokenId, caller, canisterSelf(), amount);
+        await odinPullToken(
+            this.odinLedger(),
+            tokenId,
+            caller,
+            canisterSelf(),
+            amount,
+        );
 
         // EFFECT: credit only what actually settled.
         const key = makeKey(caller.toText(), tokenId);
@@ -154,6 +209,7 @@ export default class {
             // allowance. If this throws (no/low approval, insufficient BTC) no
             // tokens have left, and the debit is refunded below.
             await odinPullToken(
+                this.odinLedger(),
                 ODIN_BTC_TOKEN_ID,
                 caller,
                 canisterSelf(),
@@ -161,7 +217,7 @@ export default class {
             );
             // Then the token send. The canister pays the outbound BTC fee out of
             // the BTC just pulled, so it nets zero.
-            await odinSendToken(tokenId, caller, amount);
+            await odinSendToken(this.odinLedger(), tokenId, caller, amount);
         } catch (error) {
             // Refund the token debit. A fee already pulled before a later
             // failure is NOT refunded — returning it would cost another BTC
@@ -201,6 +257,19 @@ export default class {
     getOwner(): [Principal] | [] {
         const owner = this.config.get('owner');
         return owner === undefined ? [] : [Principal.fromText(owner)];
+    }
+
+    /**
+     * The Odin ledger canister this canister holds funds on. Check it matches
+     * the frontend's `VITE_ODIN_ENV` (dev → `w5cxm`, prod/staging → `yspgd`).
+     *
+     * `@update`, not `@query`, so the answer is consensus-certified: since the
+     * ledger is an init argument, the wasm hash alone no longer proves which
+     * ledger a deployed canister uses, and auditors should verify it here.
+     */
+    @update([], IDL.Principal)
+    getOdinLedger(): Principal {
+        return this.odinLedger();
     }
 
     /**
