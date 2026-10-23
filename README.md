@@ -255,10 +255,13 @@ not griefable. The flow:
    fails after the fee pull, the fee is forfeited (not refunded — returning it
    would cost another BTC transfer), leaving the canister a small BTC surplus.
 
-Why 2×: pulling BTC is itself a transfer, and the ledger charges the caller a
-fee on that pull too (debited from `from`, per ICRC-2). So the withdrawer pays
-the fee twice — once for the pull, once funding the send — and the approval must
-cover both. See `ODIN_BTC_FEE` in
+Why 2×: the canister pulls 1× the fee. Standard ICRC-2 spends amount + fee
+from the allowance, so a standard ledger needs 2×. The Odin DEV ledger measured
+otherwise: it debits the allowance by the amount only and takes the pull fee
+from the caller's balance. The PROD ledger runs different wasm and is
+unverified, so the approval keeps the extra fee as headroom; it works under
+both models. The withdrawer pays 3 fees in total (300 sats): the approve, the
+pulled fee, and the ledger fee on that pull. See `ODIN_BTC_FEE` in
 [`packages/canister/src/odin.ts`](packages/canister/src/odin.ts) and
 [`packages/frontend/src/lib/fees.ts`](packages/frontend/src/lib/fees.ts).
 
