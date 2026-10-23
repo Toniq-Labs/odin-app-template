@@ -234,8 +234,8 @@ export function WithdrawForm({ actor, balances, refresh }: WithdrawFormProps) {
 
         // Approve BTC for the withdrawal fee. The canister pulls this during
         // withdraw to pay the Odin ledger's per-transfer fee, so withdrawals
-        // need no canister BTC float. The allowance covers the fee twice (the
-        // pull amount + the ledger fee on that pull) — see lib/fees.ts.
+        // need no canister BTC float. The allowance is the pulled fee plus one
+        // fee of headroom — see lib/fees.ts.
         //
         // The approval's `request.input` is the fee, not the withdrawal, so
         // the token + amount to withdraw ride in `returnState`: it survives
