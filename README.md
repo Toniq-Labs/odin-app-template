@@ -112,12 +112,105 @@ Upgrading an older fork (odin-connect 1.6/1.7)? Follow the SDK's
 [readme](https://github.com/Toniq-Labs/odin-connect#readme) ("State and
 sessions", "Wallet in-app browsers").
 
+## Verifying logins on a backend (optional)
+
+The template has no backend, and the app canister does not need one to know
+who is calling: the IC authenticates every call, so `msgCaller()` is already
+the user's principal. You only need this section if you add an **off-chain
+service**, such as an API, bot or admin tool, that must know which Odin user
+is calling it. A principal sent by the browser proves nothing on its own.
+
+[odin-auth-verify](https://www.npmjs.com/package/odin-auth-verify) verifies an
+Odin Connect login on a Node.js server. The browser signs a short login
+message with its Odin Connect session key and sends it with the delegation
+chain. The server checks the chain and the signature and gets back the user's
+principal, the same one the canister sees as caller.
+
+> **Pre-release:** the package is at `0.0.4` and its API may change before
+> `0.1.0`. Pin the exact version (`"odin-auth-verify": "0.0.4"`).
+
+```sh
+npm install odin-auth-verify@0.0.4 @icp-sdk/core   # Node.js 22+
+```
+
+**Browser.** Connect with `requires_delegation: true` and
+`targets: [APP_CANISTER_ID]`, as this template already does in
+[`OdinConnectProvider`](packages/frontend/src/odin/OdinConnectProvider.tsx).
+Without a delegation, `user.getIdentity()` is `null` and there is nothing to
+sign. Sign `prefix + timestamp` with the identity:
+
+```ts
+const LOGIN_MESSAGE_PREFIX = 'my-app-login:v1\n'; // unique to your app
+
+const identity = user.getIdentity()!;
+const timestamp = Date.now().toString();
+const signature = await identity.sign(
+    new TextEncoder().encode(`${LOGIN_MESSAGE_PREFIX}${timestamp}`),
+);
+const body = {
+    delegation: JSON.stringify(identity.getDelegation().toJSON()),
+    timestamp,
+    signature: btoa(String.fromCharCode(...new Uint8Array(signature))),
+};
+// POST body to your backend
+```
+
+**Server.** Build the verifier once at startup and call it per request:
+
+```ts
+import {
+    OdinLoginError,
+    createMemoryReplayGuard,
+    createOdinLoginVerifier,
+} from 'odin-auth-verify';
+
+const verifyLogin = createOdinLoginVerifier({
+    appCanisterId: process.env.APP_CANISTER_ID!, // same as VITE_APP_CANISTER_ID
+    messagePrefix: 'my-app-login:v1\n', // same as the browser
+    replayGuard: createMemoryReplayGuard(), // one process only
+});
+
+try {
+    const { principal } = await verifyLogin(body);
+    // issue your own session (cookie, JWT) for `principal`
+} catch (error) {
+    if (error instanceof OdinLoginError) {
+        // respond 401; error.code says why (REPLAYED, NOT_SCOPED_TO_APP, …)
+    }
+    throw error;
+}
+```
+
+It rejects a login that is older than 5 minutes, expired, scoped to a
+different canister, badly signed, signed for another app's prefix, or already
+used. Things to get right in a fork:
+
+- `appCanisterId` must be **your** canister. A delegation Odin issued to
+  another app is then rejected even if it is valid.
+- `messagePrefix` must be unique to your app and identical on both sides. It
+  must not be empty or end with a digit.
+- `createMemoryReplayGuard()` only works for one server process. With several
+  instances, implement `ReplayGuard` on a shared store (Redis
+  `SET key 1 NX PXAT expiresAtMs`, or a table with a unique key).
+- Canister signatures verify against the IC mainnet root key. Only when Odin
+  itself runs on a local replica do you pass `rootKey` to
+  `createOdinLoginVerifier`. Take it from startup configuration, never from the
+  request.
+
+A runnable version is in [`examples/backend-login`](examples/backend-login):
+a `node:http` server with `POST /login`, plus a dependency-free
+`login-client.ts` you can copy into the frontend. See the
+[package README](https://github.com/Toniq-Labs/odin-auth-verify#readme) for
+error codes and the lower-level verifiers.
+
 ## Layout
 
 ```
 packages/
   canister/   # Azle canister — internal multi-token ledger
   frontend/   # Vite + React app — Odin Connect auth + deposit/withdraw UI
+examples/
+  backend-login/  # optional Node backend verifying Odin logins (not in the workspace)
 dfx.json      # canister (azle) + frontend (asset) canister config
 ```
 
@@ -323,6 +416,12 @@ CORE` markers in
 flows are built on the [odin-connect](https://www.npmjs.com/package/odin-connect)
 SDK — render from its state, never from an awaited call (see
 [Odin Connect in the frontend](#odin-connect-in-the-frontend)).
+
+**Add an off-chain backend** — verify Odin logins with
+[odin-auth-verify](https://www.npmjs.com/package/odin-auth-verify) instead of
+trusting a principal sent by the browser. See
+[Verifying logins on a backend](#verifying-logins-on-a-backend-optional) and
+[`examples/backend-login`](examples/backend-login).
 
 **Add a language (i18n)** — the frontend is localized with
 [react-i18next](https://react.i18next.com/). English (`en`) is the default and

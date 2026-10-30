@@ -1,0 +1,22 @@
+{
+    "name": "odin-app-backend-login-example",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Minimal Node backend that verifies Odin Connect logins with odin-auth-verify",
+    "type": "module",
+    "engines": {
+        "node": ">=22.6"
+    },
+    "scripts": {
+        "start": "node --experimental-strip-types server.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@icp-sdk/core": "^6.1.0",
+        "odin-auth-verify": "0.0.4"
+    },
+    "devDependencies": {
+        "@types/node": "^22.20.5",
+        "typescript": "^5.9.0"
+    }
+}

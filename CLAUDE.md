@@ -14,6 +14,8 @@ copied and learned from.
 packages/
   canister/   # Azle canister — multi-token internal ledger (TypeScript → wasm)
   frontend/   # Vite + React app — Odin Connect auth + deposit/withdraw UI
+examples/
+  backend-login/  # optional Node backend (odin-auth-verify), not in the pnpm workspace
 dfx.json      # canister (azle) + frontend (asset) canister config
 ```
 
