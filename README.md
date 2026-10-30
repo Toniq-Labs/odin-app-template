@@ -126,8 +126,11 @@ message with its Odin Connect session key and sends it with the delegation
 chain. The server checks the chain and the signature and gets back the user's
 principal, the same one the canister sees as caller.
 
-> **Pre-release:** the package is at `0.0.4` and its API may change before
-> `0.1.0`. Pin the exact version (`"odin-auth-verify": "0.0.4"`).
+> **Version:** this guide is written against `0.0.4`. The package is still
+> `0.x`, so any release can change the API. Pin the exact version
+> (`"odin-auth-verify": "0.0.4"`) and read the
+> [changelog](https://github.com/Toniq-Labs/odin-auth-verify/blob/main/CHANGELOG.md)
+> before upgrading.
 
 ```sh
 npm install odin-auth-verify@0.0.4 @icp-sdk/core   # Node.js 22+
