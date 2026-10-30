@@ -173,14 +173,22 @@ const verifyLogin = createOdinLoginVerifier({
     replayGuard: createMemoryReplayGuard(), // one process only
 });
 
-try {
-    const { principal } = await verifyLogin(body);
-    // issue your own session (cookie, JWT) for `principal`
-} catch (error) {
-    if (error instanceof OdinLoginError) {
-        // respond 401; error.code says why (REPLAYED, NOT_SCOPED_TO_APP, …)
+async function handleLogin(
+    body: unknown,
+): Promise<{ status: number; body: object }> {
+    try {
+        const { principal } = await verifyLogin(
+            body as Parameters<typeof verifyLogin>[0],
+        );
+        // issue your own session (cookie, JWT) for `principal`
+        return { status: 200, body: { principal } };
+    } catch (error) {
+        if (error instanceof OdinLoginError) {
+            // error.code says why (REPLAYED, NOT_SCOPED_TO_APP, …)
+            return { status: 401, body: { error: error.code } };
+        }
+        throw error; // a real server error, not a bad login
     }
-    throw error;
 }
 ```
 
